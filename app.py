@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import hashlib
 import io
 import os
 import re
@@ -11,14 +12,12 @@ from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 import joblib
 import pandas as pd
-from passlib.context import CryptContext
 from pydantic import BaseModel
 
 SECRET_KEY = "super-secret-key-change-this-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 app = FastAPI(title="Smart Expense Analyzer")
@@ -39,10 +38,19 @@ except Exception:
   classifier = None
 
 
+# Надійне хешування без зовнішніх несумісних бібліотек
+def hash_password(password: str) -> str:
+  salt = "expense_salt_2026"
+  return hashlib.sha256((password + salt).encode("utf-8")).hexdigest()
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+  return hash_password(plain_password) == hashed_password
+
+
 def init_db():
   with sqlite3.connect(DB_FILE) as conn:
     cursor = conn.cursor()
-    # Створюємо таблицю користувачів
     cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +58,6 @@ def init_db():
                 password_hash TEXT NOT NULL
             )
         """)
-    # Таблиця транзакцій з прив'язкою до user_id
     cursor.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +74,6 @@ def init_db():
 
 init_db()
 
-# Підключення статики
 if os.path.exists("static"):
   app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -79,7 +85,6 @@ def serve_index():
   return FileResponse("index.html")
 
 
-# --- Авторизація та моделі ---
 class UserAuth(BaseModel):
   email: str
   password: str
@@ -112,13 +117,13 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
 @app.post("/api/auth/register")
 def register(user: UserAuth):
   email = user.email.strip().lower()
-  hashed_pwd = pwd_context.hash(user.password)
+  pwd_hash = hash_password(user.password)
   try:
     with sqlite3.connect(DB_FILE) as conn:
       cursor = conn.cursor()
       cursor.execute(
           "INSERT INTO users (email, password_hash) VALUES (?, ?)",
-          (email, hashed_pwd),
+          (email, pwd_hash),
       )
       user_id = cursor.lastrowid
       conn.commit()
@@ -139,7 +144,7 @@ def login(user: UserAuth):
     )
     row = cursor.fetchone()
 
-  if not row or not pwd_context.verify(user.password, row[1]):
+  if not row or not verify_password(user.password, row[1]):
     raise HTTPException(
         status_code=400, detail="Неправильний email або пароль"
     )
@@ -147,7 +152,6 @@ def login(user: UserAuth):
   return {"token": create_token(row[0]), "email": email}
 
 
-# --- Захищені ендпоінти витрат ---
 def parse_raw_text(raw: str):
   raw = raw.strip()
   match = re.search(r"(\d+([.,]\d+)?)", raw)

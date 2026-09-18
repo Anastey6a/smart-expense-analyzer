@@ -65,7 +65,7 @@ df = pd.DataFrame(train_records, columns=["description", "category"])
 
 pipeline = Pipeline(
     [
-        ("tfidf", TfidfVectorizer(ngram_range=(1, 2), lowercase=True)),
+       ("tfidf", TfidfVectorizer(ngram_range=(1, 2), lowercase=True)),
         ("clf", LinearSVC(C=1.0, random_state=42)),
     ]
 )

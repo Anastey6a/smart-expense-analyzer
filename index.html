@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Smart Expense Analyzer</title>
+  
+  <!-- Підключення PWA та мобільного повноекранного режиму -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0B0F19">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Montserrat', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    /* Стилізація під iOS notch та safe-area */
+    .safe-top { padding-top: env(safe-area-inset-top, 20px); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 24px); }
+    .custom-scroll::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body class="bg-[#0B0F19] text-slate-100 min-h-screen flex flex-col justify-between select-none">
+
+  <!-- Основний контент застосунку -->
+  <main class="w-full max-w-md mx-auto flex-1 flex flex-col px-4 pt-4 pb-24 safe-top gap-5">
+    
+    <!-- Top App Bar -->
+    <header class="flex justify-between items-center py-1">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-sm shadow-md">
+          📊
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Data Science</span>
+          <h1 class="text-sm font-extrabold text-white leading-tight">Smart Expense</h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 bg-[#171F32] border border-slate-800 px-2.5 py-1 rounded-full text-[11px] font-semibold text-emerald-400">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        ML Active
+      </div>
+    </header>
+
+    <!-- Головна картка: Сума + Прогноз -->
+    <section class="relative overflow-hidden bg-gradient-to-br from-[#1E2640] via-[#161C2E] to-[#0E131F] rounded-3xl p-5 border border-slate-700/50 shadow-2xl">
+      <div class="flex justify-between items-center text-xs text-slate-400 font-medium">
+        <span>Витрати цього місяця</span>
+        <span class="text-[11px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md font-semibold" id="periodBadge">Серпень</span>
+      </div>
+      
+      <div class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5" id="totalSpent">0 ₴</div>
+
+      <div class="mt-4 pt-3.5 border-t border-slate-700/40 flex justify-between items-end">
+        <div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Прогноз на наступний місяць</div>
+          <div class="text-base sm:text-lg font-bold text-indigo-300 mt-0.5" id="forecastTotal">~0 ₴</div>
+        </div>
+        <span class="text-[10px] font-semibold text-slate-300 bg-slate-800/90 px-2 py-1 rounded-lg border border-slate-700/60">
+          AI Forecast
+        </span>
+      </div>
+    </section>
+
+    <!-- ВКЛАДКА 1: ГОЛОВНА (АНАЛІТИКА) -->
+    <div id="viewAnalytics" class="flex flex-col gap-4">
+      
+      <!-- Кругова діаграма та відсотки -->
+      <section class="bg-[#171F32]/60 border border-slate-800 rounded-3xl p-4 flex flex-col gap-3">
+        <div class="flex justify-between items-center">
+          <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Розподіл витрат</h2>
+          <span class="text-[11px] text-indigo-400 font-medium" id="txCountBadge">0 оп.</span>
+        </div>
+
+        <div class="w-36 h-36 mx-auto relative flex items-center justify-center my-1">
+          <canvas id="expenseChart"></canvas>
+          <div id="chartCenterInfo" class="absolute text-[11px] text-slate-500 text-center font-medium">Немає даних</div>
+        </div>
+
+        <!-- 5 обов'язкових категорій -->
+        <div class="grid grid-cols-1 gap-1.5" id="categoryRows"></div>
+      </section>
+
+      <!-- Останні транзакції -->
+      <section class="flex flex-col gap-2">
+        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Останні дії</h2>
+        <div class="flex flex-col gap-2 max-h-40 overflow-y-auto custom-scroll" id="txListContainer"></div>
+      </section>
+
+    </div>
+
+    <!-- ВКЛАДКА 2: ДОДАВАННЯ (З'ЯВЛЯЄТЬСЯ ПО КЛІКУ НА "+") -->
+    <div id="viewAdd" class="hidden flex flex-col gap-4">
+      <div class="bg-[#171F32]/80 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4">
+        <h2 class="text-sm font-bold text-white">Нова витрата</h2>
+        
+        <form onsubmit="handleManualAdd(event)" class="flex flex-col gap-3">
+          <div>
+            <label class="text-[11px] text-slate-400 font-semibold mb-1 block">Опис та сума</label>
+            <input 
+              type="text" 
+              id="descInput" 
+              placeholder="наприклад: Сільпо 420 або Таксі 150" 
+              class="w-full bg-[#1A2234] border border-slate-700/70 focus:border-indigo-500 rounded-2xl py-3 px-4 text-sm text-white placeholder-slate-500 outline-none transition-all"
+            />
+          </div>
+
+          <div>
+            <div class="text-[11px] text-slate-400 font-semibold mb-1.5 flex justify-between">
+              <span>Категорія</span>
+              <button type="button" onclick="selectCategory('auto')" id="cat-auto" class="text-[10px] text-indigo-400 underline font-bold">Авто (ML)</button>
+            </div>
+
+            <!-- 5 категорій -->
+            <div class="grid grid-cols-5 gap-1.5">
+              <button type="button" onclick="selectCategory('їжа')" id="cat-їжа" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
+                <span>🍔</span><span class="text-[10px] truncate">Їжа</span>
+              </button>
+              <button type="button" onclick="selectCategory('транспорт')" id="cat-транспорт" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
+                <span>🚗</span><span class="text-[10px] truncate">Трансп.</span>
+              </button>
+              <button type="button" onclick="selectCategory('комунальні')" id="cat-комунальні" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
+                <span>💡</span><span class="text-[10px] truncate">Комун.</span>
+              </button>
+              <button type="button" onclick="selectCategory('покупки')" id="cat-покупки" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
+                <span>🛍</span><span class="text-[10px] truncate">Покупки</span>
+              </button>
+              <button type="button" onclick="selectCategory('розваги')" id="cat-розваги" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
+                <span>🎉</span><span class="text-[10px] truncate">Розваги</span>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold py-3 rounded-2xl text-sm transition-all shadow-lg shadow-indigo-600/30">
+            Зберегти витрату
+          </button>
+        </form>
+      </div>
+
+      <!-- Або завантаження CSV файлу -->
+      <div class="border-2 border-dashed border-slate-800 rounded-3xl p-4 text-center">
+        <input type="file" id="fileInput" accept=".csv" class="hidden" onchange="handleFileChange(event)">
+        <label for="fileInput" class="cursor-pointer flex flex-col items-center">
+          <span class="text-2xl mb-1">📁</span>
+          <span class="text-xs font-bold text-indigo-400">Або імпортувати виписку (.csv)</span>
+          <span id="fileNameLabel" class="text-[10px] text-slate-500 mt-0.5">Банківський експорт</span>
+        </label>
+        <button id="uploadBtn" onclick="uploadCsvFile()" class="mt-3 w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 rounded-xl text-xs disabled:opacity-30" disabled>
+          Обробити через AI
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- НАВІГАЦІЙНИЙ НИЖНІЙ БАР (Мобільне меню як у нативних додатках) -->
+  <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#121826]/90 backdrop-blur-xl border-t border-slate-800/80 px-6 py-2 safe-bottom flex justify-around items-center z-50">
+    <button onclick="switchMobileTab('analytics')" id="navAnalytics" class="flex flex-col items-center gap-1 text-indigo-400 transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      <span class="text-[10px] font-semibold">Аналітика</span>
+    </button>
+
+    <!-- Велика кругла кнопка швидкого додавання по центру -->
+    <button onclick="switchMobileTab('add')" id="navAdd" class="-mt-5 w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-500 active:scale-90 text-white flex items-center justify-center text-2xl font-bold shadow-lg shadow-indigo-600/40 border-4 border-[#0B0F19] transition-all">
+      +
+    </button>
+
+    <button onclick="refreshData()" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      <span class="text-[10px] font-semibold">Оновити</span>
+    </button>
+  </nav>
+
+  <script>
+    let selectedCategory = 'auto';
+    let chartInstance = null;
+    let statementFile = null;
+
+    const CATEGORIES = ['їжа', 'транспорт', 'комунальні', 'покупки', 'розваги'];
+
+    const META = {
+      'їжа': { icon: '🍔', name: 'Їжа', color: '#6366F1' },
+      'транспорт': { icon: '🚗', name: 'Транспорт', color: '#38BDF8' },
+      'комунальні': { icon: '💡', name: 'Комунальні', color: '#F59E0B' },
+      'покупки': { icon: '🛍', name: 'Покупки', color: '#EC4899' },
+      'розваги': { icon: '🎉', name: 'Розваги', color: '#10B981' }
+    };
+
+    function switchMobileTab(tab) {
+      const viewAnalytics = document.getElementById('viewAnalytics');
+      const viewAdd = document.getElementById('viewAdd');
+      const navAnalytics = document.getElementById('navAnalytics');
+
+      if (tab === 'analytics') {
+        viewAnalytics.classList.remove('hidden');
+        viewAdd.classList.add('hidden');
+        navAnalytics.classList.add('text-indigo-400');
+        navAnalytics.classList.remove('text-slate-500');
+      } else {
+        viewAnalytics.classList.add('hidden');
+        viewAdd.classList.remove('hidden');
+        navAnalytics.classList.remove('text-indigo-400');
+        navAnalytics.classList.add('text-slate-500');
+      }
+    }
+
+    function selectCategory(cat) {
+      selectedCategory = cat;
+      document.querySelectorAll('.cat-pill').forEach(btn => {
+        btn.classList.remove('border-indigo-500', 'bg-indigo-600/20', 'text-indigo-300');
+        btn.classList.add('border-slate-800', 'bg-[#1A2234]', 'text-slate-100');
+      });
+
+      const autoBtn = document.getElementById('cat-auto');
+      if (cat === 'auto') {
+        autoBtn.classList.add('font-bold', 'text-indigo-400');
+      } else {
+        autoBtn.classList.remove('font-bold');
+        const activeBtn = document.getElementById(`cat-${cat}`);
+        if (activeBtn) {
+          activeBtn.classList.add('border-indigo-500', 'bg-indigo-600/20', 'text-indigo-300');
+        }
+      }
+    }
+
+    async function handleManualAdd(e) {
+      e.preventDefault();
+      const input = document.getElementById('descInput');
+      const val = input.value.trim();
+      if (!val) return;
+
+      try {
+        const res = await fetch('/api/expenses/smart-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            raw_text: val,
+            manual_category: selectedCategory === 'auto' ? null : selectedCategory
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || 'Помилка');
+          return;
+        }
+
+        input.value = '';
+        selectCategory('auto');
+        switchMobileTab('analytics');
+        await loadDashboard();
+      } catch (err) {
+        alert('Помилка мережі');
+      }
+    }
+
+    function handleFileChange(event) {
+      statementFile = event.target.files[0];
+      if (statementFile) {
+        document.getElementById('fileNameLabel').innerText = statementFile.name;
+        document.getElementById('uploadBtn').disabled = false;
+      }
+    }
+
+    async function uploadCsvFile() {
+      if (!statementFile) return;
+      const formData = new FormData();
+      formData.append('file', statementFile);
+
+      try {
+        const res = await fetch('/api/analyze-and-save', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || 'Помилка файлу');
+          return;
+        }
+        document.getElementById('fileInput').value = '';
+        document.getElementById('uploadBtn').disabled = true;
+        statementFile = null;
+        switchMobileTab('analytics');
+        await loadDashboard();
+      } catch (err) {
+        alert('Помилка сервера');
+      }
+    }
+
+    async function deleteItem(id) {
+      await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+      await loadDashboard();
+    }
+
+    function refreshData() {
+      loadDashboard();
+    }
+
+    async function loadDashboard() {
+      try {
+        const res = await fetch('/api/dashboard');
+        const data = await res.json();
+
+        document.getElementById('totalSpent').innerText = `${data.total_spent.toLocaleString('uk-UA')} ₴`;
+        document.getElementById('forecastTotal').innerText = `~${data.forecast_next_month.toLocaleString('uk-UA')} ₴`;
+        document.getElementById('txCountBadge').innerText = `${data.recent_transactions.length} оп.`;
+
+        renderBreakdown(data.breakdown);
+        renderTransactions(data.recent_transactions);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderBreakdown(breakdown) {
+      const container = document.getElementById('categoryRows');
+      container.innerHTML = '';
+
+      const chartLabels = [];
+      const chartValues = [];
+      const chartColors = [];
+
+      CATEGORIES.forEach(cat => {
+        const meta = META[cat];
+        const info = breakdown[cat] || { sum: 0, percentage: 0 };
+
+        if (info.sum > 0) {
+          chartLabels.push(meta.name);
+          chartValues.push(info.percentage);
+          chartColors.push(meta.color);
+        }
+
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 rounded-xl bg-[#1A2234] border border-slate-800/80 text-xs";
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-sm">${meta.icon}</span>
+            <span class="font-semibold text-slate-200 text-xs">${meta.name}</span>
+          </div>
+          <div class="text-right flex items-center gap-2.5">
+            <span class="font-extrabold text-white text-xs">${info.percentage}%</span>
+            <span class="text-[10px] text-slate-400 w-16 text-right">${info.sum.toLocaleString('uk-UA')} ₴</span>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+
+      const centerText = document.getElementById('chartCenterInfo');
+      if (chartValues.length === 0) {
+        centerText.classList.remove('hidden');
+      } else {
+        centerText.classList.add('hidden');
+      }
+
+      if (chartInstance) chartInstance.destroy();
+      const ctx = document.getElementById('expenseChart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: chartLabels,
+          datasets: [{
+            data: chartValues.length > 0 ? chartValues : [1],
+            backgroundColor: chartValues.length > 0 ? chartColors : ['#242C40'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          cutout: '74%',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function renderTransactions(transactions) {
+      const container = document.getElementById('txListContainer');
+      container.innerHTML = '';
+
+      if (transactions.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs text-slate-600 py-2">Немає транзакцій</div>`;
+        return;
+      }
+
+      transactions.forEach(t => {
+        const meta = META[t.category] || { icon: '📌', name: t.category };
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 rounded-xl bg-[#171F32]/80 border border-slate-800/80 text-xs";
+        row.innerHTML = `
+          <div class="flex items-center gap-2 truncate">
+            <div class="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center text-xs">
+              ${meta.icon}
+            </div>
+            <div class="truncate">
+              <div class="font-semibold text-white truncate text-xs">${t.description}</div>
+              <div class="text-[9px] text-slate-500">${t.date}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-100 text-xs">-${t.amount.toLocaleString('uk-UA')} ₴</span>
+            <button onclick="deleteItem(${t.id})" class="text-slate-600 hover:text-rose-400 font-bold px-1">×</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

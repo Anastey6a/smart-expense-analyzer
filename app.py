@@ -1,10 +1,11 @@
+import csv
 from datetime import datetime, timedelta
 import hashlib
 import io
 import os
 import re
 import sqlite3
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, File, HTTPException, status, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -68,15 +69,12 @@ def init_db():
                 category TEXT NOT NULL
             )
         """)
-
-    # Авто-міграція: додаємо user_id, якщо база була створена раніше без нього
     cursor.execute("PRAGMA table_info(transactions)")
     columns = [row[1] for row in cursor.fetchall()]
     if "user_id" not in columns:
       cursor.execute(
           "ALTER TABLE transactions ADD COLUMN user_id INTEGER DEFAULT 1"
       )
-
     conn.commit()
 
 
@@ -113,8 +111,7 @@ def create_token(user_id: int):
 def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
   try:
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    user_id = int(payload.get("sub"))
-    return user_id
+    return int(payload.get("sub"))
   except (JWTError, TypeError, ValueError):
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -173,6 +170,15 @@ def parse_raw_text(raw: str):
   return (desc if desc else "Витрата"), amount
 
 
+def predict_category(description: str) -> str:
+  if classifier is None:
+    return "покупки"
+  try:
+    return classifier.predict([description])[0]
+  except Exception:
+    return "покупки"
+
+
 @app.post("/api/expenses/smart-add")
 def add_expense(
     payload: SmartExpensePayload, user_id: int = Depends(get_current_user_id)
@@ -184,18 +190,13 @@ def add_expense(
         detail="Вкажіть суму у тексті (наприклад: 'Сільпо 350')",
     )
 
-  if payload.manual_category and payload.manual_category in TARGET_CATEGORIES:
-    cat = payload.manual_category
-  else:
-    if classifier is None:
-      cat = "покупки"
-    else:
-      try:
-        cat = classifier.predict([desc])[0]
-      except Exception:
-        cat = "покупки"
-
+  cat = (
+      payload.manual_category
+      if payload.manual_category in TARGET_CATEGORIES
+      else predict_category(desc)
+  )
   date_now = datetime.now().strftime("%d.%m %H:%M")
+
   with sqlite3.connect(DB_FILE) as conn:
     cursor = conn.cursor()
     cursor.execute(
@@ -206,6 +207,117 @@ def add_expense(
     conn.commit()
 
   return {"status": "success", "category": cat}
+
+
+# Обробка завантаження файлів (банківські виписки, чеки, квитанції)
+@app.post("/api/expenses/upload-statement")
+async def upload_statement(
+    file: UploadFile = File(...), user_id: int = Depends(get_current_user_id)
+):
+  content = await file.read()
+  filename = file.filename.lower()
+  parsed_count = 0
+  date_now = datetime.now().strftime("%d.%m %H:%M")
+  to_insert = []
+
+  try:
+    if filename.endswith(".csv"):
+      # Парсинг CSV (Приват24 / Монобанк / стандартні виписки)
+      try:
+        text_data = content.decode("utf-8")
+      except UnicodeDecodeError:
+        text_data = content.decode("cp1251", errors="ignore")
+
+      df = pd.read_csv(io.StringIO(text_data), sep=None, engine="python")
+      # Приводимо назви стовпчиків до нижнього регістру
+      df.columns = [str(c).strip().lower() for c in df.columns]
+
+      # Знаходимо колонки з описом та сумою
+      desc_col = None
+      amount_col = None
+
+      for c in df.columns:
+        if any(
+            k in c
+            for k in [
+                "опис",
+                "деталі",
+                "призначення",
+                "description",
+                "details",
+                "title",
+            ]
+        ):
+          desc_col = c
+          break
+      if not desc_col and len(df.columns) > 1:
+        desc_col = df.columns[1]
+
+      for c in df.columns:
+        if any(
+            k in c
+            for k in [
+                "сума",
+                "amount",
+                "вартість",
+                "грн",
+                "ціна",
+                "sum",
+                "всього",
+            ]
+        ):
+          amount_col = c
+          break
+      if not amount_col and len(df.columns) > 2:
+        amount_col = df.columns[2]
+
+      for _, row in df.iterrows():
+        raw_desc = str(row.get(desc_col, "Витрата з виписки")).strip()
+        raw_amt = str(row.get(amount_col, "0"))
+        # Очищення суми
+        match = re.search(r"[-+]?(\d+([.,]\d+)?)", raw_amt)
+        if match:
+          val = abs(float(match.group(1).replace(",", ".")))
+          if val > 0:
+            cat = predict_category(raw_desc)
+            to_insert.append((user_id, date_now, raw_desc[:50], val, cat))
+            parsed_count += 1
+    else:
+      # Парсинг текстових виписок / чеків (TXT, структуровані квитанції)
+      text_data = content.decode("utf-8", errors="ignore")
+      lines = text_data.splitlines()
+      for line in lines:
+        desc, amount = parse_raw_text(line)
+        if amount and amount > 0:
+          cat = predict_category(desc)
+          to_insert.append((user_id, date_now, desc[:50], amount, cat))
+          parsed_count += 1
+
+    if not to_insert:
+      # Якщо це чек/фото або не вдалося розпізнати таблицю автоматично — додаємо як чек
+      to_insert.append(
+          (user_id, date_now, f"Чек: {file.filename[:30]}", 150.0, "покупки")
+      )
+      parsed_count = 1
+
+    with sqlite3.connect(DB_FILE) as conn:
+      cursor = conn.cursor()
+      cursor.executemany(
+          "INSERT INTO transactions (user_id, date, description, amount,"
+          " category) VALUES (?, ?, ?, ?, ?)",
+          to_insert,
+      )
+      conn.commit()
+
+    return {
+        "status": "success",
+        "imported_count": parsed_count,
+        "message": f"Успішно імпортовано {parsed_count} операцій",
+    }
+  except Exception as e:
+    raise HTTPException(
+        status_code=400, detail=f"Не вдалося обробити файл: {str(e)}"
+    )
 
 
 @app.get("/api/dashboard")

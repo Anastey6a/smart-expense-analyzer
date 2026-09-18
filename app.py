@@ -15,6 +15,7 @@ from jose import JWTError, jwt
 import joblib
 import pandas as pd
 from pydantic import BaseModel
+from pypdf import PdfReader
 
 SECRET_KEY = "smart-expense-secret-key-2026"
 ALGORITHM = "HS256"
@@ -192,7 +193,7 @@ def predict_category(description: str) -> str:
     return "покупки"
 
 
-# РЕЖИМ 1: Швидкий Smart-текст (один рядок: 'Сільпо 350')
+# РЕЖИМ 1: Швидкий Smart-текст
 @app.post("/api/expenses/smart-add")
 def add_smart_expense(
     payload: SmartExpensePayload, user_id: int = Depends(get_current_user_id)
@@ -223,7 +224,7 @@ def add_smart_expense(
   return {"status": "success", "category": cat}
 
 
-# РЕЖИМ 2: Класичне ручне введення (окремі поля: назва + сума + категорія)
+# РЕЖИМ 2: Класичне ручне введення
 @app.post("/api/expenses/manual-add")
 def add_manual_expense(
     payload: ManualExpensePayload, user_id: int = Depends(get_current_user_id)
@@ -253,7 +254,68 @@ def add_manual_expense(
   return {"status": "success", "category": cat}
 
 
-# Завантаження виписок (.csv, .txt), чеків або фото з камери
+# Парсинг банківських PDF-виписок
+def parse_pdf_statement(pdf_bytes: bytes):
+  items = []
+  try:
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    full_text = ""
+    for page in reader.pages:
+      text = page.extract_text()
+      if text:
+        full_text += text + "\n"
+
+    lines = full_text.splitlines()
+    for line in lines:
+      line_clean = line.strip()
+      if not line_clean or len(line_clean) < 5:
+        continue
+
+      lower_l = line_clean.lower()
+      if any(
+          skip in lower_l
+          for skip in [
+              "залишок",
+              "iban",
+              "єдрпоу",
+              "номер картки",
+              "виписка",
+              "період",
+              "всього",
+              "баланс",
+          ]
+      ):
+        continue
+
+      amount_match = re.search(r"[-−]\s*(\d+[\s\d]*[.,]\d{2})", line_clean)
+      if not amount_match:
+        amount_match = re.search(
+            r"(\d+[.,]\d{2})\s*(?:грн|uah)?", line_clean, re.IGNORECASE
+        )
+
+      if amount_match:
+        raw_amt = amount_match.group(1).replace(" ", "").replace(",", ".")
+        try:
+          val = float(raw_amt)
+          if 0.5 <= val <= 250000:
+            desc = (
+                line_clean[: amount_match.start()]
+                + line_clean[amount_match.end() :]
+            )
+            desc = re.sub(r"\d{2}[.:/]\d{2}([.:/]\d{2,4})?", "", desc)
+            desc = re.sub(r"\d{2}:\d{2}(:\d{2})?", "", desc)
+            desc = re.sub(r"[^\w\s\.\-]", " ", desc)
+            desc = re.sub(r"\s+", " ", desc).strip()
+            if len(desc) >= 3:
+              items.append((desc[:50], val))
+        except ValueError:
+          continue
+  except Exception as err:
+    print(f"Error parsing PDF: {err}")
+  return items
+
+
+# Завантаження виписок (PDF, CSV, TXT), чеків або фото з камери
 @app.post("/api/expenses/upload-statement")
 async def upload_statement(
     file: UploadFile = File(...), user_id: int = Depends(get_current_user_id)
@@ -265,7 +327,22 @@ async def upload_statement(
   parsed_count = 0
 
   try:
-    if filename.endswith(".csv"):
+    # 1. PDF-виписки
+    if filename.endswith(".pdf"):
+      pdf_records = parse_pdf_statement(content)
+      for desc, amt in pdf_records:
+        cat = predict_category(desc)
+        to_insert.append((user_id, date_now, desc, amt, cat))
+        parsed_count += 1
+
+      if not to_insert:
+        to_insert.append(
+            (user_id, date_now, f"PDF: {file.filename[:30]}", 250.0, "покупки")
+        )
+        parsed_count = 1
+
+    # 2. CSV-файли
+    elif filename.endswith(".csv"):
       try:
         text_data = content.decode("utf-8")
       except Exception:
@@ -323,6 +400,7 @@ async def upload_statement(
             to_insert.append((user_id, date_now, raw_desc[:50], val, cat))
             parsed_count += 1
 
+    # 3. TXT-файли
     elif filename.endswith(".txt"):
       text_data = content.decode("utf-8", errors="ignore")
       for line in text_data.splitlines():
@@ -332,8 +410,8 @@ async def upload_statement(
           to_insert.append((user_id, date_now, desc[:50], amount, cat))
           parsed_count += 1
 
+    # 4. Фото чеків (JPG, PNG, HEIC)
     else:
-      # Зображення чеків (JPG, PNG, HEIC) або PDF
       clean_name = os.path.splitext(file.filename)[0] if file.filename else ""
       clean_name = re.sub(r"[_\-\.]+", " ", clean_name).strip()
       if len(clean_name) < 3 or clean_name.lower().startswith("image"):
@@ -368,8 +446,7 @@ async def upload_statement(
     }
 
   except Exception:
-    # Безпечний фолбек для гарантії успішного збереження
-    fallback_item = (user_id, date_now, "📸 Чек (скан)", 150.0, "покупки")
+    fallback_item = (user_id, date_now, "📸 Чек / Виписка", 150.0, "покупки")
     with sqlite3.connect(DB_FILE) as conn:
       cursor = conn.cursor()
       cursor.execute(
@@ -381,7 +458,7 @@ async def upload_statement(
     return {
         "status": "success",
         "imported_count": 1,
-        "message": "Чек успішно розпізнано та додано до витрат",
+        "message": "Файл успішно додано до витрат",
     }
 
 

@@ -1,415 +1,677 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SmartExpense" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="/static/manifest.json" />
   <title>Smart Expense Analyzer</title>
-  
-  <!-- Підключення PWA та мобільного повноекранного режиму -->
-  <link rel="manifest" href="/static/manifest.json">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0B0F19">
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts & Chart.js -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
-    body {
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-inner: #243056;
+      --accent-color: #48cae4;
+      --accent-hover: #0096c7;
+      --text-main: #ffffff;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
       font-family: 'Montserrat', sans-serif;
       -webkit-tap-highlight-color: transparent;
-      user-select: none;
     }
-    /* Стилізація під iOS notch та safe-area */
-    .safe-top { padding-top: env(safe-area-inset-top, 20px); }
-    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 24px); }
-    .custom-scroll::-webkit-scrollbar { display: none; }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding-bottom: 40px;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 4px 8px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--accent-color);
+    }
+
+    .user-tag {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .btn-logout {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .balance-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: linear-gradient(135deg, #1c2541 0%, #1e293b 100%);
+      border: 1px solid rgba(72, 202, 228, 0.2);
+    }
+
+    .balance-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .balance-val {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .forecast-box {
+      background: var(--card-inner);
+      padding: 10px 14px;
+      border-radius: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .forecast-box span {
+      color: var(--text-muted);
+    }
+
+    .forecast-box strong {
+      color: var(--accent-color);
+      font-size: 0.95rem;
+    }
+
+    /* Add Expense Form */
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .input-text {
+      width: 100%;
+      background: var(--card-inner);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 14px 16px;
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-text:focus {
+      border-color: var(--accent-color);
+    }
+
+    .chip-container {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+
+    .chip-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip {
+      background: var(--card-inner);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .chip.active {
+      background: var(--accent-color);
+      color: #0b132b;
+      font-weight: 700;
+      border-color: var(--accent-color);
+    }
+
+    .btn-submit {
+      background: var(--accent-color);
+      color: #0b132b;
+      border: none;
+      padding: 14px;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 0.2s;
+    }
+
+    .btn-submit:hover {
+      background-color: var(--accent-hover);
+    }
+
+    /* Chart Card */
+    .chart-container {
+      position: relative;
+      height: 220px;
+      margin: 10px 0;
+    }
+
+    /* Transactions list */
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tx-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tx-item {
+      background: var(--card-inner);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tx-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .tx-desc {
+      font-weight: 600;
+      font-size: 0.92rem;
+    }
+
+    .tx-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+    }
+
+    .tx-cat-badge {
+      background: rgba(72, 202, 228, 0.15);
+      color: var(--accent-color);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .tx-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tx-amount {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #fff;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .btn-delete:hover {
+      color: var(--danger);
+    }
+
+    /* Auth Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(11, 19, 43, 0.92);
+      backdrop-filter: blur(10px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      width: 100%;
+      max-width: 380px;
+      border-radius: 24px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .modal-header h2 {
+      font-size: 1.4rem;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .modal-header p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .auth-tabs {
+      display: flex;
+      background: var(--card-inner);
+      border-radius: 12px;
+      padding: 4px;
+    }
+
+    .auth-tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .auth-tab.active {
+      background: var(--accent-color);
+      color: #0b132b;
+    }
+
+    .auth-error {
+      color: var(--danger);
+      font-size: 0.8rem;
+      display: none;
+    }
   </style>
 </head>
-<body class="bg-[#0B0F19] text-slate-100 min-h-screen flex flex-col justify-between select-none">
+<body>
 
-  <!-- Основний контент застосунку -->
-  <main class="w-full max-w-md mx-auto flex-1 flex flex-col px-4 pt-4 pb-24 safe-top gap-5">
-    
-    <!-- Top App Bar -->
-    <header class="flex justify-between items-center py-1">
-      <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-sm shadow-md">
-          📊
-        </div>
-        <div>
-          <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Data Science</span>
-          <h1 class="text-sm font-extrabold text-white leading-tight">Smart Expense</h1>
-        </div>
+  <!-- Вхід / Реєстрація Модальне Вікно -->
+  <div class="modal-overlay" id="authModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="authTitle">Вхід у систему</h2>
+        <p>Керуйте власними витратами безпечно</p>
       </div>
-      <div class="flex items-center gap-1.5 bg-[#171F32] border border-slate-800 px-2.5 py-1 rounded-full text-[11px] font-semibold text-emerald-400">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        ML Active
+
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tabLogin" onclick="switchAuthMode('login')">Вхід</div>
+        <div class="auth-tab" id="tabRegister" onclick="switchAuthMode('register')">Реєстрація</div>
       </div>
+
+      <div class="input-group">
+        <input type="email" id="authEmail" class="input-text" placeholder="Електронна пошта" autocomplete="email" />
+        <input type="password" id="authPassword" class="input-text" placeholder="Пароль" />
+      </div>
+
+      <div class="auth-error" id="authError"></div>
+
+      <button class="btn-submit" id="authBtn" onclick="handleAuth()">Увійти</button>
+    </div>
+  </div>
+
+  <div class="container" id="appContent">
+    <header>
+      <div class="brand">
+        <h1>Smart Expense</h1>
+        <div class="user-tag" id="userBadge">Завантаження...</div>
+      </div>
+      <button class="btn-logout" onclick="logout()">Вийти</button>
     </header>
 
-    <!-- Головна картка: Сума + Прогноз -->
-    <section class="relative overflow-hidden bg-gradient-to-br from-[#1E2640] via-[#161C2E] to-[#0E131F] rounded-3xl p-5 border border-slate-700/50 shadow-2xl">
-      <div class="flex justify-between items-center text-xs text-slate-400 font-medium">
-        <span>Витрати цього місяця</span>
-        <span class="text-[11px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md font-semibold" id="periodBadge">Серпень</span>
+    <!-- Баланс і Прогноз -->
+    <div class="card balance-card">
+      <div class="balance-title">Загальні витрати</div>
+      <div class="balance-val" id="totalSpent">0.00 ₴</div>
+      <div class="forecast-box">
+        <span>Прогноз на наступний місяць:</span>
+        <strong id="forecastVal">0.00 ₴</strong>
       </div>
-      
-      <div class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1.5" id="totalSpent">0 ₴</div>
-
-      <div class="mt-4 pt-3.5 border-t border-slate-700/40 flex justify-between items-end">
-        <div>
-          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Прогноз на наступний місяць</div>
-          <div class="text-base sm:text-lg font-bold text-indigo-300 mt-0.5" id="forecastTotal">~0 ₴</div>
-        </div>
-        <span class="text-[10px] font-semibold text-slate-300 bg-slate-800/90 px-2 py-1 rounded-lg border border-slate-700/60">
-          AI Forecast
-        </span>
-      </div>
-    </section>
-
-    <!-- ВКЛАДКА 1: ГОЛОВНА (АНАЛІТИКА) -->
-    <div id="viewAnalytics" class="flex flex-col gap-4">
-      
-      <!-- Кругова діаграма та відсотки -->
-      <section class="bg-[#171F32]/60 border border-slate-800 rounded-3xl p-4 flex flex-col gap-3">
-        <div class="flex justify-between items-center">
-          <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Розподіл витрат</h2>
-          <span class="text-[11px] text-indigo-400 font-medium" id="txCountBadge">0 оп.</span>
-        </div>
-
-        <div class="w-36 h-36 mx-auto relative flex items-center justify-center my-1">
-          <canvas id="expenseChart"></canvas>
-          <div id="chartCenterInfo" class="absolute text-[11px] text-slate-500 text-center font-medium">Немає даних</div>
-        </div>
-
-        <!-- 5 обов'язкових категорій -->
-        <div class="grid grid-cols-1 gap-1.5" id="categoryRows"></div>
-      </section>
-
-      <!-- Останні транзакції -->
-      <section class="flex flex-col gap-2">
-        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Останні дії</h2>
-        <div class="flex flex-col gap-2 max-h-40 overflow-y-auto custom-scroll" id="txListContainer"></div>
-      </section>
-
     </div>
 
-    <!-- ВКЛАДКА 2: ДОДАВАННЯ (З'ЯВЛЯЄТЬСЯ ПО КЛІКУ НА "+") -->
-    <div id="viewAdd" class="hidden flex flex-col gap-4">
-      <div class="bg-[#171F32]/80 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4">
-        <h2 class="text-sm font-bold text-white">Нова витрата</h2>
+    <!-- Додавання витрати -->
+    <div class="card">
+      <div class="section-title">Швидке додавання витрати</div>
+      <div class="input-group">
+        <input type="text" id="rawInput" class="input-text" placeholder="Наприклад: Продукти 450 або Таксі 120" />
         
-        <form onsubmit="handleManualAdd(event)" class="flex flex-col gap-3">
-          <div>
-            <label class="text-[11px] text-slate-400 font-semibold mb-1 block">Опис та сума</label>
-            <input 
-              type="text" 
-              id="descInput" 
-              placeholder="наприклад: Сільпо 420 або Таксі 150" 
-              class="w-full bg-[#1A2234] border border-slate-700/70 focus:border-indigo-500 rounded-2xl py-3 px-4 text-sm text-white placeholder-slate-500 outline-none transition-all"
-            />
-          </div>
+        <div class="chip-container">
+          <div class="chip active" data-cat="" onclick="selectChip(this)">Авто-визначення (ML)</div>
+          <div class="chip" data-cat="їжа" onclick="selectChip(this)">Їжа</div>
+          <div class="chip" data-cat="транспорт" onclick="selectChip(this)">Транспорт</div>
+          <div class="chip" data-cat="комунальні" onclick="selectChip(this)">Комунальні</div>
+          <div class="chip" data-cat="покупки" onclick="selectChip(this)">Покупки</div>
+          <div class="chip" data-cat="розваги" onclick="selectChip(this)">Розваги</div>
+        </div>
 
-          <div>
-            <div class="text-[11px] text-slate-400 font-semibold mb-1.5 flex justify-between">
-              <span>Категорія</span>
-              <button type="button" onclick="selectCategory('auto')" id="cat-auto" class="text-[10px] text-indigo-400 underline font-bold">Авто (ML)</button>
-            </div>
-
-            <!-- 5 категорій -->
-            <div class="grid grid-cols-5 gap-1.5">
-              <button type="button" onclick="selectCategory('їжа')" id="cat-їжа" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
-                <span>🍔</span><span class="text-[10px] truncate">Їжа</span>
-              </button>
-              <button type="button" onclick="selectCategory('транспорт')" id="cat-транспорт" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
-                <span>🚗</span><span class="text-[10px] truncate">Трансп.</span>
-              </button>
-              <button type="button" onclick="selectCategory('комунальні')" id="cat-комунальні" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
-                <span>💡</span><span class="text-[10px] truncate">Комун.</span>
-              </button>
-              <button type="button" onclick="selectCategory('покупки')" id="cat-покупки" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
-                <span>🛍</span><span class="text-[10px] truncate">Покупки</span>
-              </button>
-              <button type="button" onclick="selectCategory('розваги')" id="cat-розваги" class="cat-pill py-2 rounded-xl bg-[#1A2234] border border-slate-800 text-[11px] flex flex-col items-center gap-1 transition-all">
-                <span>🎉</span><span class="text-[10px] truncate">Розваги</span>
-              </button>
-            </div>
-          </div>
-
-          <button type="submit" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold py-3 rounded-2xl text-sm transition-all shadow-lg shadow-indigo-600/30">
-            Зберегти витрату
-          </button>
-        </form>
-      </div>
-
-      <!-- Або завантаження CSV файлу -->
-      <div class="border-2 border-dashed border-slate-800 rounded-3xl p-4 text-center">
-        <input type="file" id="fileInput" accept=".csv" class="hidden" onchange="handleFileChange(event)">
-        <label for="fileInput" class="cursor-pointer flex flex-col items-center">
-          <span class="text-2xl mb-1">📁</span>
-          <span class="text-xs font-bold text-indigo-400">Або імпортувати виписку (.csv)</span>
-          <span id="fileNameLabel" class="text-[10px] text-slate-500 mt-0.5">Банківський експорт</span>
-        </label>
-        <button id="uploadBtn" onclick="uploadCsvFile()" class="mt-3 w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 rounded-xl text-xs disabled:opacity-30" disabled>
-          Обробити через AI
+        <button class="btn-submit" onclick="addExpense()">
+          <span>Зберегти витрату</span>
         </button>
       </div>
     </div>
 
-  </main>
+    <!-- Діаграма витрат -->
+    <div class="card">
+      <div class="section-title">Розподіл за категоріями</div>
+      <div class="chart-container">
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </div>
 
-  <!-- НАВІГАЦІЙНИЙ НИЖНІЙ БАР (Мобільне меню як у нативних додатках) -->
-  <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#121826]/90 backdrop-blur-xl border-t border-slate-800/80 px-6 py-2 safe-bottom flex justify-around items-center z-50">
-    <button onclick="switchMobileTab('analytics')" id="navAnalytics" class="flex flex-col items-center gap-1 text-indigo-400 transition-colors">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-      <span class="text-[10px] font-semibold">Аналітика</span>
-    </button>
-
-    <!-- Велика кругла кнопка швидкого додавання по центру -->
-    <button onclick="switchMobileTab('add')" id="navAdd" class="-mt-5 w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-500 active:scale-90 text-white flex items-center justify-center text-2xl font-bold shadow-lg shadow-indigo-600/40 border-4 border-[#0B0F19] transition-all">
-      +
-    </button>
-
-    <button onclick="refreshData()" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-      <span class="text-[10px] font-semibold">Оновити</span>
-    </button>
-  </nav>
+    <!-- Останні транзакції -->
+    <div class="card">
+      <div class="section-title">Останні транзакції</div>
+      <div class="tx-list" id="txList">
+        <!-- Елементи списку додаються через JS -->
+      </div>
+    </div>
+  </div>
 
   <script>
-    let selectedCategory = 'auto';
-    let chartInstance = null;
-    let statementFile = null;
+    let currentAuthMode = 'login';
+    let selectedCategory = '';
+    let expenseChart = null;
 
-    const CATEGORIES = ['їжа', 'транспорт', 'комунальні', 'покупки', 'розваги'];
+    function getAuthToken() {
+      return localStorage.getItem('token');
+    }
 
-    const META = {
-      'їжа': { icon: '🍔', name: 'Їжа', color: '#6366F1' },
-      'транспорт': { icon: '🚗', name: 'Транспорт', color: '#38BDF8' },
-      'комунальні': { icon: '💡', name: 'Комунальні', color: '#F59E0B' },
-      'покупки': { icon: '🛍', name: 'Покупки', color: '#EC4899' },
-      'розваги': { icon: '🎉', name: 'Розваги', color: '#10B981' }
-    };
-
-    function switchMobileTab(tab) {
-      const viewAnalytics = document.getElementById('viewAnalytics');
-      const viewAdd = document.getElementById('viewAdd');
-      const navAnalytics = document.getElementById('navAnalytics');
-
-      if (tab === 'analytics') {
-        viewAnalytics.classList.remove('hidden');
-        viewAdd.classList.add('hidden');
-        navAnalytics.classList.add('text-indigo-400');
-        navAnalytics.classList.remove('text-slate-500');
+    function checkAuth() {
+      const token = getAuthToken();
+      const email = localStorage.getItem('user_email');
+      if (!token) {
+        document.getElementById('authModal').style.display = 'flex';
       } else {
-        viewAnalytics.classList.add('hidden');
-        viewAdd.classList.remove('hidden');
-        navAnalytics.classList.remove('text-indigo-400');
-        navAnalytics.classList.add('text-slate-500');
+        document.getElementById('authModal').style.display = 'none';
+        document.getElementById('userBadge').innerText = email || 'Мій акаунт';
+        loadDashboard();
       }
     }
 
-    function selectCategory(cat) {
-      selectedCategory = cat;
-      document.querySelectorAll('.cat-pill').forEach(btn => {
-        btn.classList.remove('border-indigo-500', 'bg-indigo-600/20', 'text-indigo-300');
-        btn.classList.add('border-slate-800', 'bg-[#1A2234]', 'text-slate-100');
-      });
-
-      const autoBtn = document.getElementById('cat-auto');
-      if (cat === 'auto') {
-        autoBtn.classList.add('font-bold', 'text-indigo-400');
+    function switchAuthMode(mode) {
+      currentAuthMode = mode;
+      document.getElementById('authError').style.display = 'none';
+      if (mode === 'login') {
+        document.getElementById('tabLogin').classList.add('active');
+        document.getElementById('tabRegister').classList.remove('active');
+        document.getElementById('authTitle').innerText = 'Вхід у систему';
+        document.getElementById('authBtn').innerText = 'Увійти';
       } else {
-        autoBtn.classList.remove('font-bold');
-        const activeBtn = document.getElementById(`cat-${cat}`);
-        if (activeBtn) {
-          activeBtn.classList.add('border-indigo-500', 'bg-indigo-600/20', 'text-indigo-300');
-        }
+        document.getElementById('tabRegister').classList.add('active');
+        document.getElementById('tabLogin').classList.remove('active');
+        document.getElementById('authTitle').innerText = 'Реєстрація';
+        document.getElementById('authBtn').innerText = 'Зареєструватися';
       }
     }
 
-    async function handleManualAdd(e) {
-      e.preventDefault();
-      const input = document.getElementById('descInput');
-      const val = input.value.trim();
-      if (!val) return;
+    async function handleAuth() {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const errorDiv = document.getElementById('authError');
+
+      if (!email || !password) {
+        errorDiv.innerText = 'Заповніть усі поля';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      const endpoint = currentAuthMode === 'login' ? '/api/auth/login' : '/api/auth/register';
 
       try {
-        const res = await fetch('/api/expenses/smart-add', {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            raw_text: val,
-            manual_category: selectedCategory === 'auto' ? null : selectedCategory
-          })
+          body: JSON.stringify({ email, password })
         });
 
+        const data = await res.json();
         if (!res.ok) {
-          const err = await res.json();
-          alert(err.detail || 'Помилка');
-          return;
+          throw new Error(data.detail || 'Помилка авторизації');
         }
 
-        input.value = '';
-        selectCategory('auto');
-        switchMobileTab('analytics');
-        await loadDashboard();
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user_email', data.email);
+        errorDiv.style.display = 'none';
+        checkAuth();
       } catch (err) {
-        alert('Помилка мережі');
+        errorDiv.innerText = err.message;
+        errorDiv.style.display = 'block';
       }
     }
 
-    function handleFileChange(event) {
-      statementFile = event.target.files[0];
-      if (statementFile) {
-        document.getElementById('fileNameLabel').innerText = statementFile.name;
-        document.getElementById('uploadBtn').disabled = false;
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user_email');
+      checkAuth();
+    }
+
+    function selectChip(el) {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      selectedCategory = el.getAttribute('data-cat');
+    }
+
+    async function authFetch(url, options = {}) {
+      const token = getAuthToken();
+      if (!options.headers) options.headers = {};
+      options.headers['Authorization'] = `Bearer ${token}`;
+      
+      const response = await fetch(url, options);
+      if (response.status === 401) {
+        logout();
+        throw new Error('Сесія завершилась');
       }
-    }
-
-    async function uploadCsvFile() {
-      if (!statementFile) return;
-      const formData = new FormData();
-      formData.append('file', statementFile);
-
-      try {
-        const res = await fetch('/api/analyze-and-save', { method: 'POST', body: formData });
-        if (!res.ok) {
-          const err = await res.json();
-          alert(err.detail || 'Помилка файлу');
-          return;
-        }
-        document.getElementById('fileInput').value = '';
-        document.getElementById('uploadBtn').disabled = true;
-        statementFile = null;
-        switchMobileTab('analytics');
-        await loadDashboard();
-      } catch (err) {
-        alert('Помилка сервера');
-      }
-    }
-
-    async function deleteItem(id) {
-      await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-      await loadDashboard();
-    }
-
-    function refreshData() {
-      loadDashboard();
+      return response;
     }
 
     async function loadDashboard() {
       try {
-        const res = await fetch('/api/dashboard');
+        const res = await authFetch('/api/dashboard');
         const data = await res.json();
 
-        document.getElementById('totalSpent').innerText = `${data.total_spent.toLocaleString('uk-UA')} ₴`;
-        document.getElementById('forecastTotal').innerText = `~${data.forecast_next_month.toLocaleString('uk-UA')} ₴`;
-        document.getElementById('txCountBadge').innerText = `${data.recent_transactions.length} оп.`;
+        document.getElementById('totalSpent').innerText = `${data.total_spent.toFixed(2)} ₴`;
+        document.getElementById('forecastVal').innerText = `${data.forecast_next_month.toFixed(2)} ₴`;
 
-        renderBreakdown(data.breakdown);
+        renderChart(data.breakdown);
         renderTransactions(data.recent_transactions);
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error(err);
       }
     }
 
-    function renderBreakdown(breakdown) {
-      const container = document.getElementById('categoryRows');
-      container.innerHTML = '';
+    function renderChart(breakdown) {
+      const ctx = document.getElementById('categoryChart').getContext('2d');
+      const labels = Object.keys(breakdown);
+      const values = labels.map(k => breakdown[k].sum);
 
-      const chartLabels = [];
-      const chartValues = [];
-      const chartColors = [];
+      const colors = ['#48cae4', '#0077b6', '#52b788', '#f77f00', '#d62828'];
 
-      CATEGORIES.forEach(cat => {
-        const meta = META[cat];
-        const info = breakdown[cat] || { sum: 0, percentage: 0 };
-
-        if (info.sum > 0) {
-          chartLabels.push(meta.name);
-          chartValues.push(info.percentage);
-          chartColors.push(meta.color);
-        }
-
-        const row = document.createElement('div');
-        row.className = "flex items-center justify-between p-2 rounded-xl bg-[#1A2234] border border-slate-800/80 text-xs";
-        row.innerHTML = `
-          <div class="flex items-center gap-2">
-            <span class="text-sm">${meta.icon}</span>
-            <span class="font-semibold text-slate-200 text-xs">${meta.name}</span>
-          </div>
-          <div class="text-right flex items-center gap-2.5">
-            <span class="font-extrabold text-white text-xs">${info.percentage}%</span>
-            <span class="text-[10px] text-slate-400 w-16 text-right">${info.sum.toLocaleString('uk-UA')} ₴</span>
-          </div>
-        `;
-        container.appendChild(row);
-      });
-
-      const centerText = document.getElementById('chartCenterInfo');
-      if (chartValues.length === 0) {
-        centerText.classList.remove('hidden');
-      } else {
-        centerText.classList.add('hidden');
+      if (expenseChart) {
+        expenseChart.destroy();
       }
 
-      if (chartInstance) chartInstance.destroy();
-      const ctx = document.getElementById('expenseChart').getContext('2d');
-      chartInstance = new Chart(ctx, {
+      expenseChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: chartLabels,
+          labels: labels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
           datasets: [{
-            data: chartValues.length > 0 ? chartValues : [1],
-            backgroundColor: chartValues.length > 0 ? chartColors : ['#242C40'],
-            borderWidth: 0
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 0,
+            hoverOffset: 4
           }]
         },
         options: {
-          cutout: '74%',
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } }
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: '#94a3b8',
+                font: { family: 'Montserrat', size: 11 },
+                padding: 14
+              }
+            }
+          },
+          cutout: '70%'
         }
       });
     }
 
-    function renderTransactions(transactions) {
-      const container = document.getElementById('txListContainer');
-      container.innerHTML = '';
+    function renderTransactions(list) {
+      const listEl = document.getElementById('txList');
+      listEl.innerHTML = '';
 
-      if (transactions.length === 0) {
-        container.innerHTML = `<div class="text-center text-xs text-slate-600 py-2">Немає транзакцій</div>`;
+      if (!list || list.length === 0) {
+        listEl.innerHTML = '<div style="color:#64748b;font-size:0.85rem;text-align:center;padding:12px;">Немає записів</div>';
         return;
       }
 
-      transactions.forEach(t => {
-        const meta = META[t.category] || { icon: '📌', name: t.category };
-        const row = document.createElement('div');
-        row.className = "flex items-center justify-between p-2 rounded-xl bg-[#171F32]/80 border border-slate-800/80 text-xs";
-        row.innerHTML = `
-          <div class="flex items-center gap-2 truncate">
-            <div class="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center text-xs">
-              ${meta.icon}
-            </div>
-            <div class="truncate">
-              <div class="font-semibold text-white truncate text-xs">${t.description}</div>
-              <div class="text-[9px] text-slate-500">${t.date}</div>
+      list.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'tx-item';
+        div.innerHTML = `
+          <div class="tx-left">
+            <div class="tx-desc">${item.description}</div>
+            <div class="tx-sub">
+              <span>${item.date}</span>
+              <span class="tx-cat-badge">${item.category}</span>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-slate-100 text-xs">-${t.amount.toLocaleString('uk-UA')} ₴</span>
-            <button onclick="deleteItem(${t.id})" class="text-slate-600 hover:text-rose-400 font-bold px-1">×</button>
+          <div class="tx-right">
+            <span class="tx-amount">-${item.amount} ₴</span>
+            <button class="btn-delete" onclick="deleteExpense(${item.id})">✕</button>
           </div>
         `;
-        container.appendChild(row);
+        listEl.appendChild(div);
       });
     }
 
-    loadDashboard();
+    async function addExpense() {
+      const input = document.getElementById('rawInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      try {
+        const res = await authFetch('/api/expenses/smart-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            raw_text: text,
+            manual_category: selectedCategory || null
+          })
+        });
+
+        if (res.ok) {
+          input.value = '';
+          loadDashboard();
+        } else {
+          const err = await res.json();
+          alert(err.detail || 'Помилка додавання');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function deleteExpense(id) {
+      try {
+        const res = await authFetch(`/api/expenses/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          loadDashboard();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Запуск при завантаженні сторінки
+    window.onload = checkAuth;
   </script>
 </body>
 </html>

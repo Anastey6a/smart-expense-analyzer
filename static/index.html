@@ -5,8 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SmartExpense" />
+  <meta name="theme-color" content="#0b132b" />
+  <link rel="manifest" href="/static/manifest.json" />
   <title>Smart Expense Analyzer</title>
 
+  <!-- Google Fonts & Chart.js -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -14,63 +18,392 @@
 
   <style>
     :root {
-      --bg: #0b132b;
-      --card: #1c2541;
-      --input: #243056;
-      --accent: #48cae4;
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-inner: #243056;
+      --accent-color: #48cae4;
       --accent-hover: #0096c7;
-      --text: #ffffff;
-      --muted: #94a3b8;
+      --text-main: #ffffff;
+      --text-muted: #94a3b8;
       --danger: #ef4444;
-      --border: rgba(255, 255, 255, 0.08);
+      --border-color: rgba(255, 255, 255, 0.08);
       --radius: 20px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; -webkit-tap-highlight-color: transparent; }
-    body { background-color: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
-    .container { max-width: 480px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Montserrat', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-    header { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; }
-    .brand h1 { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
-    .user-tag { font-size: 0.75rem; color: var(--muted); }
-    .btn-logout { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 6px 14px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding-bottom: 40px;
+      overflow-x: hidden;
+    }
 
-    .card { background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
-    .balance-card { display: flex; flex-direction: column; gap: 10px; background: linear-gradient(135deg, #1c2541 0%, #1e293b 100%); border: 1px solid rgba(72, 202, 228, 0.2); }
-    .balance-title { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .balance-val { font-size: 2.2rem; font-weight: 700; color: #fff; }
-    .forecast-box { background: var(--input); padding: 10px 14px; border-radius: 14px; display: flex; justify-content: space-between; font-size: 0.85rem; }
-    .forecast-box strong { color: var(--accent); }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
 
-    .input-group { display: flex; flex-direction: column; gap: 10px; }
-    .input-text { width: 100%; background: var(--input); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; color: #fff; font-size: 1rem; outline: none; }
-    .input-text:focus { border-color: var(--accent); }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 4px 8px;
+    }
 
-    .chip-container { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-    .chip { background: var(--input); border: 1px solid var(--border); color: var(--muted); padding: 7px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 500; cursor: pointer; white-space: nowrap; }
-    .chip.active { background: var(--accent); color: #0b132b; font-weight: 700; border-color: var(--accent); }
+    .brand h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--accent-color);
+    }
 
-    .btn-submit { background: var(--accent); color: #0b132b; border: none; padding: 14px; border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; text-align: center; }
-    .btn-submit:active { background: var(--accent-hover); }
+    .user-tag {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
 
-    .chart-container { position: relative; height: 200px; margin: 10px 0; display: flex; justify-content: center; align-items: center; }
-    .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
+    .btn-logout {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
 
-    .tx-list { display: flex; flex-direction: column; gap: 10px; }
-    .tx-item { background: var(--input); border-radius: 14px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; }
-    .tx-desc { font-weight: 600; font-size: 0.92rem; }
-    .tx-sub { font-size: 0.75rem; color: var(--muted); display: flex; gap: 8px; margin-top: 2px; }
-    .tx-cat-badge { background: rgba(72, 202, 228, 0.15); color: var(--accent); padding: 2px 8px; border-radius: 6px; font-weight: 600; }
-    .tx-amount { font-weight: 700; font-size: 1rem; color: #fff; }
-    .btn-delete { background: none; border: none; color: #64748b; font-size: 1.1rem; cursor: pointer; padding: 4px; }
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
 
-    /* Modal */
-    .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 19, 43, 0.96); display: flex; justify-content: center; align-items: center; padding: 20px; z-index: 9999; }
-    .modal-card { background: var(--card); border: 1px solid var(--border); width: 100%; max-width: 380px; border-radius: 24px; padding: 28px 24px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; gap: 16px; }
-    .auth-tabs { display: flex; background: var(--input); border-radius: 12px; padding: 4px; }
-    .auth-tab { flex: 1; text-align: center; padding: 10px; font-size: 0.85rem; font-weight: 600; color: var(--muted); border-radius: 8px; cursor: pointer; }
-    .auth-tab.active { background: var(--accent); color: #0b132b; }
-    .auth-error { color: var(--danger); font-size: 0.82rem; display: none; }
+    .balance-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: linear-gradient(135deg, #1c2541 0%, #1e293b 100%);
+      border: 1px solid rgba(72, 202, 228, 0.2);
+    }
+
+    .balance-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .balance-val {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .forecast-box {
+      background: var(--card-inner);
+      padding: 10px 14px;
+      border-radius: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .forecast-box strong {
+      color: var(--accent-color);
+      font-size: 0.95rem;
+    }
+
+    /* Вкладки перемикання режимів */
+    .mode-tabs {
+      display: flex;
+      background: var(--card-inner);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 14px;
+    }
+
+    .mode-tab {
+      flex: 1;
+      text-align: center;
+      padding: 9px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-tab.active {
+      background: var(--accent-color);
+      color: #0b132b;
+      font-weight: 700;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .input-text {
+      width: 100%;
+      background: var(--card-inner);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 14px 16px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-text:focus {
+      border-color: var(--accent-color);
+    }
+
+    .chip-container {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+
+    .chip-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip {
+      background: var(--card-inner);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .chip.active {
+      background: var(--accent-color);
+      color: #0b132b;
+      font-weight: 700;
+      border-color: var(--accent-color);
+    }
+
+    .btn-submit {
+      background: var(--accent-color);
+      color: #0b132b;
+      border: none;
+      padding: 14px;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 0.2s;
+    }
+
+    .btn-submit:active {
+      background-color: var(--accent-hover);
+    }
+
+    /* Блок виписок та чеків */
+    .upload-box {
+      border: 2px dashed rgba(72, 202, 228, 0.35);
+      border-radius: var(--radius);
+      padding: 20px 16px;
+      text-align: center;
+      background: rgba(28, 37, 65, 0.4);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .upload-box:hover {
+      border-color: var(--accent-color);
+      background: rgba(36, 48, 86, 0.6);
+    }
+
+    .upload-icon {
+      font-size: 1.8rem;
+    }
+
+    .upload-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .upload-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .chart-container {
+      position: relative;
+      height: 220px;
+      margin: 10px 0;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tx-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tx-item {
+      background: var(--card-inner);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tx-desc {
+      font-weight: 600;
+      font-size: 0.92rem;
+    }
+
+    .tx-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .tx-cat-badge {
+      background: rgba(72, 202, 228, 0.15);
+      color: var(--accent-color);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .tx-amount {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #fff;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .btn-delete:hover {
+      color: var(--danger);
+    }
+
+    /* Модальне вікно входу */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(11, 19, 43, 0.96);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      z-index: 9999;
+    }
+
+    .modal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      width: 100%;
+      max-width: 380px;
+      border-radius: 24px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .modal-header h2 {
+      font-size: 1.4rem;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .modal-header p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .auth-tabs {
+      display: flex;
+      background: var(--card-inner);
+      border-radius: 12px;
+      padding: 4px;
+    }
+
+    .auth-tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .auth-tab.active {
+      background: var(--accent-color);
+      color: #0b132b;
+    }
+
+    .auth-error {
+      color: var(--danger);
+      font-size: 0.8rem;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -78,8 +411,10 @@
   <!-- Авторизація -->
   <div class="modal-overlay" id="authModal" style="display: none;">
     <div class="modal-card">
-      <h2 id="authTitle" style="font-size: 1.3rem;">Вхід у систему</h2>
-      <p style="font-size: 0.85rem; color: var(--muted);">Керуйте власними витратами безпечно</p>
+      <div class="modal-header">
+        <h2 id="authTitle">Вхід у систему</h2>
+        <p>Керуйте власними витратами безпечно</p>
+      </div>
 
       <div class="auth-tabs">
         <div class="auth-tab active" id="tabLogin" onclick="switchAuthMode('login')">Вхід</div>
@@ -99,40 +434,71 @@
   <!-- Головний екран -->
   <div class="container" id="appContent">
     <header>
-      <div class="brand">
+      <div>
         <h1>Smart Expense</h1>
-        <div class="user-tag" id="userBadge">princessvanetta8@gmail.com</div>
+        <div class="user-tag" id="userBadge">Завантаження...</div>
       </div>
       <button class="btn-logout" onclick="logout()">Вийти</button>
     </header>
 
+    <!-- Баланс і Прогноз -->
     <div class="card balance-card">
-      <div class="balance-title">Загальні витрати</div>
+      <div class="balance-title">Загальні витрати цього місяця</div>
       <div class="balance-val" id="totalSpent">0.00 ₴</div>
       <div class="forecast-box">
-        <span style="color: var(--muted);">Прогноз на місяць:</span>
+        <span style="color: var(--text-muted);">Прогноз на наступний місяць:</span>
         <strong id="forecastVal">0.00 ₴</strong>
       </div>
     </div>
 
+    <!-- КАРТКА ДОДАВАННЯ З ДВОМА РЕЖИМАМИ -->
     <div class="card">
-      <div class="section-title">Швидке додавання витрати</div>
-      <div class="input-group">
-        <input type="text" id="rawInput" class="input-text" placeholder="Наприклад: Сільпо 350 або Кава 60" />
-        
+      <div class="section-title">Додати витрату</div>
+
+      <!-- Перемикач режимів -->
+      <div class="mode-tabs">
+        <div class="mode-tab active" id="tabModeSmart" onclick="switchEntryMode('smart')">⚡ Розумний текст (AI)</div>
+        <div class="mode-tab" id="tabModeManual" onclick="switchEntryMode('manual')">✍️ Вручну по полях</div>
+      </div>
+
+      <!-- РЕЖИМ 1: Швидкий Smart-текст -->
+      <div id="smartModeView" class="input-group">
+        <input type="text" id="rawInput" class="input-text" placeholder="Наприклад: Сільпо 420 або Таксі 135" />
+      </div>
+
+      <!-- РЕЖИМ 2: Ручне введення по полях -->
+      <div id="manualModeView" class="input-group" style="display: none;">
+        <input type="text" id="manualDescInput" class="input-text" placeholder="Назва (напр. Кава, Оренда, Аптека)" />
+        <input type="number" step="0.01" id="manualAmountInput" class="input-text" placeholder="Сума (₴)" />
+      </div>
+
+      <!-- Спільні категорії -->
+      <div style="margin-top: 10px;">
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px;">Категорія:</div>
         <div class="chip-container">
-          <div class="chip active" data-cat="" onclick="selectChip(this)">Авто (ML)</div>
+          <div class="chip active" data-cat="" onclick="selectChip(this)">Авто-визначення (ML)</div>
           <div class="chip" data-cat="їжа" onclick="selectChip(this)">Їжа</div>
           <div class="chip" data-cat="транспорт" onclick="selectChip(this)">Транспорт</div>
           <div class="chip" data-cat="комунальні" onclick="selectChip(this)">Комунальні</div>
           <div class="chip" data-cat="покупки" onclick="selectChip(this)">Покупки</div>
           <div class="chip" data-cat="розваги" onclick="selectChip(this)">Розваги</div>
         </div>
-
-        <button class="btn-submit" id="saveBtn" onclick="addExpense()">Зберегти витрату</button>
       </div>
+
+      <button class="btn-submit" id="saveBtn" style="margin-top: 14px;" onclick="addExpense()">
+        Зберегти витрату
+      </button>
     </div>
 
+    <!-- Імпорт виписок та фото чеків -->
+    <div class="upload-box" onclick="triggerFileInput()">
+      <input type="file" id="fileInput" accept=".csv, .txt, image/*, .pdf" style="display: none;" onchange="handleFileUpload(this)" />
+      <div class="upload-icon">📄</div>
+      <div class="upload-title" id="uploadTitleText">Імпортувати виписку або чек</div>
+      <div class="upload-sub" id="uploadSubText">Банківський експорт (.csv), фото чека або квитанція</div>
+    </div>
+
+    <!-- Діаграма -->
     <div class="card">
       <div class="section-title">Розподіл за категоріями</div>
       <div class="chart-container">
@@ -140,6 +506,7 @@
       </div>
     </div>
 
+    <!-- Останні транзакції -->
     <div class="card">
       <div class="section-title">Останні транзакції</div>
       <div class="tx-list" id="txList"></div>
@@ -148,6 +515,7 @@
 
   <script>
     let currentAuthMode = 'login';
+    let currentEntryMode = 'smart'; // 'smart' або 'manual'
     let selectedCategory = '';
     let expenseChart = null;
 
@@ -182,6 +550,27 @@
         document.getElementById('tabLogin').classList.remove('active');
         document.getElementById('authTitle').innerText = 'Реєстрація';
         document.getElementById('authBtn').innerText = 'Зареєструватися';
+      }
+    }
+
+    // Перемикач двох режимів додавання витрати
+    function switchEntryMode(mode) {
+      currentEntryMode = mode;
+      const smartTab = document.getElementById('tabModeSmart');
+      const manualTab = document.getElementById('tabModeManual');
+      const smartView = document.getElementById('smartModeView');
+      const manualView = document.getElementById('manualModeView');
+
+      if (mode === 'smart') {
+        smartTab.classList.add('active');
+        manualTab.classList.remove('active');
+        smartView.style.display = 'flex';
+        manualView.style.display = 'none';
+      } else {
+        manualTab.classList.add('active');
+        smartTab.classList.remove('active');
+        manualView.style.display = 'flex';
+        smartView.style.display = 'none';
       }
     }
 
@@ -275,7 +664,8 @@
           datasets: [{
             data: totalSum > 0 ? values : [1],
             backgroundColor: totalSum > 0 ? colors : ['#243056'],
-            borderWidth: 0
+            borderWidth: 0,
+            hoverOffset: 4
           }]
         },
         options: {
@@ -321,26 +711,63 @@
       });
     }
 
+    // Додавання витрати (обробляє обидва режими)
     async function addExpense() {
-      const input = document.getElementById('rawInput');
-      const text = input.value.trim();
-      if (!text) return;
+      let payload = {};
+
+      if (currentEntryMode === 'smart') {
+        const rawInput = document.getElementById('rawInput');
+        const text = rawInput.value.trim();
+        if (!text) {
+          alert('Введіть текст витрати із сумою (наприклад: Сільпо 350)');
+          return;
+        }
+        payload = {
+          raw_text: text,
+          manual_category: selectedCategory || null
+        };
+      } else {
+        // Режим вручну
+        const descInput = document.getElementById('manualDescInput');
+        const amtInput = document.getElementById('manualAmountInput');
+        const desc = descInput.value.trim();
+        const amt = parseFloat(amtInput.value);
+
+        if (!desc) {
+          alert('Введіть назву витрати');
+          return;
+        }
+        if (isNaN(amt) || amt <= 0) {
+          alert('Введіть коректну суму');
+          return;
+        }
+
+        payload = {
+          description: desc,
+          amount: amt,
+          category: selectedCategory || null
+        };
+      }
 
       const btn = document.getElementById('saveBtn');
       btn.innerText = 'Збереження...';
 
+      const url = currentEntryMode === 'smart' ? '/api/expenses/smart-add' : '/api/expenses/manual-add';
+
       try {
-        const res = await authFetch('/api/expenses/smart-add', {
+        const res = await authFetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            raw_text: text,
-            manual_category: selectedCategory || null
-          })
+          body: JSON.stringify(payload)
         });
 
         if (res.ok) {
-          input.value = '';
+          if (currentEntryMode === 'smart') {
+            document.getElementById('rawInput').value = '';
+          } else {
+            document.getElementById('manualDescInput').value = '';
+            document.getElementById('manualAmountInput').value = '';
+          }
           await loadDashboard();
         } else {
           const err = await res.json();
@@ -350,6 +777,46 @@
         alert(err.message || 'Помилка мережі');
       } finally {
         btn.innerText = 'Зберегти витрату';
+      }
+    }
+
+    function triggerFileInput() {
+      document.getElementById('fileInput').click();
+    }
+
+    async function handleFileUpload(input) {
+      if (!input.files || input.files.length === 0) return;
+      const file = input.files[0];
+      const titleEl = document.getElementById('uploadTitleText');
+      const subEl = document.getElementById('uploadSubText');
+
+      titleEl.innerText = 'Обробка через AI...';
+      subEl.innerText = 'Розпізнаємо витрати та призначаємо категорії';
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const token = getAuthToken();
+        const res = await fetch('/api/expenses/upload-statement', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          alert(`Готово! ${data.message}`);
+          await loadDashboard();
+        } else {
+          alert(data.detail || 'Помилка імпорту');
+        }
+      } catch (err) {
+        alert('Помилка завантаження файлу');
+      } finally {
+        titleEl.innerText = 'Імпортувати виписку або чек';
+        subEl.innerText = 'Банківський експорт (.csv), фото чека або квитанція';
+        input.value = '';
       }
     }
 

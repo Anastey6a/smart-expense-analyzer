@@ -36,6 +36,38 @@ app.add_middleware(
 DB_FILE = "expenses.db"
 TARGET_CATEGORIES = ["їжа", "транспорт", "комунальні", "покупки", "розваги"]
 
+# Список технічних слів банківських виписок і квитанцій, які треба ігнорувати
+IGNORE_KEYWORDS = [
+    "ліцензія",
+    "нбу",
+    "квитанція",
+    "дата і час",
+    "сума грн",
+    "залишок",
+    "номер картки",
+    "єдрпоу",
+    "iban",
+    "платник",
+    "відправник",
+    "одержувач",
+    "деталі транзакції",
+    "код авторизації",
+    "універсал банк",
+    "monobank",
+    "директор",
+    "підпис",
+]
+
+
+def is_valid_transaction(description: str, amount: float) -> bool:
+  desc_lower = description.lower().strip()
+  if any(keyword in desc_lower for keyword in IGNORE_KEYWORDS):
+    return False
+  if amount <= 0:
+    return False
+  return True
+
+
 try:
   classifier = joblib.load("classifier.joblib")
 except Exception:
@@ -185,6 +217,9 @@ def parse_raw_text(raw: str):
 
 
 def predict_category(description: str) -> str:
+  desc_l = description.lower()
+  if "silpo" in desc_l or "сільпо" in desc_l or "atb" in desc_l or "атб" in desc_l:
+    return "їжа"
   if classifier is None:
     return "покупки"
   try:
@@ -193,7 +228,6 @@ def predict_category(description: str) -> str:
     return "покупки"
 
 
-# РЕЖИМ 1: Швидкий Smart-текст
 @app.post("/api/expenses/smart-add")
 def add_smart_expense(
     payload: SmartExpensePayload, user_id: int = Depends(get_current_user_id)
@@ -224,7 +258,6 @@ def add_smart_expense(
   return {"status": "success", "category": cat}
 
 
-# РЕЖИМ 2: Класичне ручне введення
 @app.post("/api/expenses/manual-add")
 def add_manual_expense(
     payload: ManualExpensePayload, user_id: int = Depends(get_current_user_id)
@@ -254,7 +287,44 @@ def add_manual_expense(
   return {"status": "success", "category": cat}
 
 
-# Парсинг банківських PDF-виписок
+# Точний аналізатор поодиноких квитанцій (наприклад, Monobank)
+def parse_monobank_single_receipt(text: str):
+  amount_match = re.search(
+      r"Сума\s*\(?грн\)?\s*[:|]?\s*(\d+([.,]\d{2}))", text, re.IGNORECASE
+  )
+  if not amount_match:
+    return None
+
+  amount = float(amount_match.group(1).replace(",", "."))
+
+  recipient_match = re.search(
+      r"Одержувач[\s\S]*?Назва\s*[:|]?\s*([^\n\r]+)", text, re.IGNORECASE
+  )
+  if recipient_match:
+    description = recipient_match.group(1).strip()
+  else:
+    dev_match = re.search(
+        r"Ідентифікатор платіжного пристрою:\s*[:|]?\s*([^\n\r]+)",
+        text,
+        re.IGNORECASE,
+    )
+    description = dev_match.group(1).strip() if dev_match else "Покупка"
+
+  date_match = re.search(
+      r"Дата і час операції\s*[:|]?\s*(\d{2}\.\d{2}\.\d{4}\s*\d{2}:\d{2})",
+      text,
+      re.IGNORECASE,
+  )
+  date_str = (
+      date_match.group(1).strip()
+      if date_match
+      else datetime.now().strftime("%d.%m %H:%M")
+  )
+
+  return [(description[:50], amount, date_str)]
+
+
+# Загальний парсинг банківських PDF-виписок
 def parse_pdf_statement(pdf_bytes: bytes):
   items = []
   try:
@@ -265,26 +335,17 @@ def parse_pdf_statement(pdf_bytes: bytes):
       if text:
         full_text += text + "\n"
 
+    # Якщо це одиночна квитанція Monobank
+    if "monobank" in full_text.lower() or "квитанція" in full_text.lower():
+      single_receipt = parse_monobank_single_receipt(full_text)
+      if single_receipt:
+        return single_receipt
+
+    # Інакше розбираємо як багаторядкову виписку
     lines = full_text.splitlines()
     for line in lines:
       line_clean = line.strip()
       if not line_clean or len(line_clean) < 5:
-        continue
-
-      lower_l = line_clean.lower()
-      if any(
-          skip in lower_l
-          for skip in [
-              "залишок",
-              "iban",
-              "єдрпоу",
-              "номер картки",
-              "виписка",
-              "період",
-              "всього",
-              "баланс",
-          ]
-      ):
         continue
 
       amount_match = re.search(r"[-−]\s*(\d+[\s\d]*[.,]\d{2})", line_clean)
@@ -297,17 +358,17 @@ def parse_pdf_statement(pdf_bytes: bytes):
         raw_amt = amount_match.group(1).replace(" ", "").replace(",", ".")
         try:
           val = float(raw_amt)
-          if 0.5 <= val <= 250000:
-            desc = (
-                line_clean[: amount_match.start()]
-                + line_clean[amount_match.end() :]
-            )
-            desc = re.sub(r"\d{2}[.:/]\d{2}([.:/]\d{2,4})?", "", desc)
-            desc = re.sub(r"\d{2}:\d{2}(:\d{2})?", "", desc)
-            desc = re.sub(r"[^\w\s\.\-]", " ", desc)
-            desc = re.sub(r"\s+", " ", desc).strip()
-            if len(desc) >= 3:
-              items.append((desc[:50], val))
+          desc = (
+              line_clean[: amount_match.start()]
+              + line_clean[amount_match.end() :]
+          )
+          desc = re.sub(r"\d{2}[.:/]\d{2}([.:/]\d{2,4})?", "", desc)
+          desc = re.sub(r"\d{2}:\d{2}(:\d{2})?", "", desc)
+          desc = re.sub(r"[^\w\s\.\-]", " ", desc)
+          desc = re.sub(r"\s+", " ", desc).strip()
+
+          if len(desc) >= 3 and is_valid_transaction(desc, val):
+            items.append((desc[:50], val, None))
         except ValueError:
           continue
   except Exception as err:
@@ -315,7 +376,6 @@ def parse_pdf_statement(pdf_bytes: bytes):
   return items
 
 
-# Завантаження виписок (PDF, CSV, TXT), чеків або фото з камери
 @app.post("/api/expenses/upload-statement")
 async def upload_statement(
     file: UploadFile = File(...), user_id: int = Depends(get_current_user_id)
@@ -327,21 +387,16 @@ async def upload_statement(
   parsed_count = 0
 
   try:
-    # 1. PDF-виписки
     if filename.endswith(".pdf"):
       pdf_records = parse_pdf_statement(content)
-      for desc, amt in pdf_records:
+      for item in pdf_records:
+        desc = item[0]
+        amt = item[1]
+        dt = item[2] if (len(item) > 2 and item[2]) else date_now
         cat = predict_category(desc)
-        to_insert.append((user_id, date_now, desc, amt, cat))
+        to_insert.append((user_id, dt, desc, amt, cat))
         parsed_count += 1
 
-      if not to_insert:
-        to_insert.append(
-            (user_id, date_now, f"PDF: {file.filename[:30]}", 250.0, "покупки")
-        )
-        parsed_count = 1
-
-    # 2. CSV-файли
     elif filename.endswith(".csv"):
       try:
         text_data = content.decode("utf-8")
@@ -395,22 +450,20 @@ async def upload_statement(
         match = re.search(r"[-+]?(\d+([.,]\d+)?)", raw_amt)
         if match:
           val = abs(float(match.group(1).replace(",", ".")))
-          if val > 0:
+          if is_valid_transaction(raw_desc, val):
             cat = predict_category(raw_desc)
             to_insert.append((user_id, date_now, raw_desc[:50], val, cat))
             parsed_count += 1
 
-    # 3. TXT-файли
     elif filename.endswith(".txt"):
       text_data = content.decode("utf-8", errors="ignore")
       for line in text_data.splitlines():
         desc, amount = parse_raw_text(line)
-        if amount and amount > 0:
+        if amount and is_valid_transaction(desc, amount):
           cat = predict_category(desc)
           to_insert.append((user_id, date_now, desc[:50], amount, cat))
           parsed_count += 1
 
-    # 4. Фото чеків (JPG, PNG, HEIC)
     else:
       clean_name = os.path.splitext(file.filename)[0] if file.filename else ""
       clean_name = re.sub(r"[_\-\.]+", " ", clean_name).strip()
@@ -425,10 +478,10 @@ async def upload_statement(
       parsed_count = 1
 
     if not to_insert:
-      to_insert.append(
-          (user_id, date_now, "📸 Чек з камери", 120.0, "покупки")
+      raise HTTPException(
+          status_code=400,
+          detail="У файлі не знайдено валідних фінансових операцій",
       )
-      parsed_count = 1
 
     with sqlite3.connect(DB_FILE) as conn:
       cursor = conn.cursor()
@@ -445,21 +498,10 @@ async def upload_statement(
         "message": f"Успішно імпортовано {parsed_count} операцій",
     }
 
-  except Exception:
-    fallback_item = (user_id, date_now, "📸 Чек / Виписка", 150.0, "покупки")
-    with sqlite3.connect(DB_FILE) as conn:
-      cursor = conn.cursor()
-      cursor.execute(
-          "INSERT INTO transactions (user_id, date, description, amount,"
-          " category) VALUES (?, ?, ?, ?, ?)",
-          fallback_item,
-      )
-      conn.commit()
-    return {
-        "status": "success",
-        "imported_count": 1,
-        "message": "Файл успішно додано до витрат",
-    }
+  except HTTPException as http_e:
+    raise http_e
+  except Exception as e:
+    raise HTTPException(status_code=400, detail=f"Помилка обробки файлу: {e}")
 
 
 @app.get("/api/dashboard")
@@ -523,26 +565,3 @@ if __name__ == "__main__":
 
   port = int(os.environ.get("PORT", 8000))
   uvicorn.run("app:app", host="0.0.0.0", port=port)
-  # Список технічних слів банківських виписок, які треба ігнорувати
-IGNORE_KEYWORDS = [
-    "ліцензія",
-    "нбу",
-    "квитанція",
-    "дата і час",
-    "сума грн",
-    "залишок",
-    "номер картки",
-    "єдрпоу",
-    "iban",
-]
-
-
-def is_valid_transaction(description: str, amount: float) -> bool:
-  desc_lower = description.lower()
-  # Якщо опис містить системні фрази банку — пропускаємо
-  if any(keyword in desc_lower for keyword in IGNORE_KEYWORDS):
-    return False
-  # Пропускаємо нульові суми
-  if amount <= 0:
-    return False
-  return True

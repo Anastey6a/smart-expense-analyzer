@@ -59,7 +59,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 4px 8px;
+      padding: 10px 4px 6px;
     }
 
     .brand h1 {
@@ -78,7 +78,7 @@
       background: rgba(239, 68, 68, 0.15);
       border: 1px solid rgba(239, 68, 68, 0.3);
       color: #f87171;
-      padding: 8px 14px;
+      padding: 7px 14px;
       border-radius: 12px;
       font-size: 0.8rem;
       font-weight: 600;
@@ -96,13 +96,13 @@
     .balance-card {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       background: linear-gradient(135deg, #1c2541 0%, #1e293b 100%);
       border: 1px solid rgba(72, 202, 228, 0.2);
     }
 
     .balance-title {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -129,20 +129,19 @@
       font-size: 0.95rem;
     }
 
-    /* Вкладки перемикання режимів */
     .mode-tabs {
       display: flex;
       background: var(--card-inner);
       border-radius: 12px;
       padding: 4px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
     .mode-tab {
       flex: 1;
       text-align: center;
       padding: 9px;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 600;
       color: var(--text-muted);
       border-radius: 8px;
@@ -219,10 +218,8 @@
       font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
+      width: 100%;
+      text-align: center;
       transition: background-color 0.2s;
     }
 
@@ -230,44 +227,50 @@
       background-color: var(--accent-hover);
     }
 
-    /* Блок виписок та чеків */
-    .upload-box {
-      border: 2px dashed rgba(72, 202, 228, 0.35);
-      border-radius: var(--radius);
-      padding: 20px 16px;
+    /* Кнопки сканування та завантаження */
+    .actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .action-upload-btn {
+      background: var(--card-inner);
+      border: 1px dashed rgba(72, 202, 228, 0.4);
+      border-radius: 16px;
+      padding: 14px 10px;
       text-align: center;
-      background: rgba(28, 37, 65, 0.4);
       cursor: pointer;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 6px;
-      transition: all 0.2s ease;
+      transition: all 0.2s;
     }
 
-    .upload-box:hover {
+    .action-upload-btn:hover {
       border-color: var(--accent-color);
-      background: rgba(36, 48, 86, 0.6);
+      background: rgba(72, 202, 228, 0.1);
     }
 
-    .upload-icon {
-      font-size: 1.8rem;
+    .action-icon {
+      font-size: 1.6rem;
     }
 
-    .upload-title {
-      font-size: 0.95rem;
+    .action-title {
+      font-size: 0.85rem;
       font-weight: 600;
       color: #fff;
     }
 
-    .upload-sub {
-      font-size: 0.75rem;
+    .action-sub {
+      font-size: 0.7rem;
       color: var(--text-muted);
     }
 
     .chart-container {
       position: relative;
-      height: 220px;
+      height: 210px;
       margin: 10px 0;
     }
 
@@ -343,7 +346,7 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(11, 19, 43, 0.96);
+      background: rgba(11, 19, 43, 0.97);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -361,7 +364,7 @@
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
     }
 
     .modal-header h2 {
@@ -401,7 +404,7 @@
 
     .auth-error {
       color: var(--danger);
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       display: none;
     }
   </style>
@@ -455,28 +458,27 @@
     <div class="card">
       <div class="section-title">Додати витрату</div>
 
-      <!-- Перемикач режимів -->
       <div class="mode-tabs">
-        <div class="mode-tab active" id="tabModeSmart" onclick="switchEntryMode('smart')">⚡ Розумний текст (AI)</div>
+        <div class="mode-tab active" id="tabModeSmart" onclick="switchEntryMode('smart')">⚡ Текстом (AI)</div>
         <div class="mode-tab" id="tabModeManual" onclick="switchEntryMode('manual')">✍️ Вручну по полях</div>
       </div>
 
-      <!-- РЕЖИМ 1: Швидкий Smart-текст -->
+      <!-- Режим 1: Розумний текст -->
       <div id="smartModeView" class="input-group">
         <input type="text" id="rawInput" class="input-text" placeholder="Наприклад: Сільпо 420 або Таксі 135" />
       </div>
 
-      <!-- РЕЖИМ 2: Ручне введення по полях -->
+      <!-- Режим 2: Ручне введення -->
       <div id="manualModeView" class="input-group" style="display: none;">
         <input type="text" id="manualDescInput" class="input-text" placeholder="Назва (напр. Кава, Оренда, Аптека)" />
         <input type="number" step="0.01" id="manualAmountInput" class="input-text" placeholder="Сума (₴)" />
       </div>
 
-      <!-- Спільні категорії -->
+      <!-- Вибір категорії -->
       <div style="margin-top: 10px;">
-        <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px;">Категорія:</div>
+        <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">Категорія:</div>
         <div class="chip-container">
-          <div class="chip active" data-cat="" onclick="selectChip(this)">Авто-визначення (ML)</div>
+          <div class="chip active" data-cat="" onclick="selectChip(this)">Авто-ML</div>
           <div class="chip" data-cat="їжа" onclick="selectChip(this)">Їжа</div>
           <div class="chip" data-cat="транспорт" onclick="selectChip(this)">Транспорт</div>
           <div class="chip" data-cat="комунальні" onclick="selectChip(this)">Комунальні</div>
@@ -490,12 +492,21 @@
       </button>
     </div>
 
-    <!-- Імпорт виписок та фото чеків -->
-    <div class="upload-box" onclick="triggerFileInput()">
-      <input type="file" id="fileInput" accept=".csv, .txt, image/*, .pdf" style="display: none;" onchange="handleFileUpload(this)" />
-      <div class="upload-icon">📄</div>
-      <div class="upload-title" id="uploadTitleText">Імпортувати виписку або чек</div>
-      <div class="upload-sub" id="uploadSubText">Банківський експорт (.csv), фото чека або квитанція</div>
+    <!-- Сканування чеків або виписок -->
+    <div class="actions-grid">
+      <div class="action-upload-btn" onclick="document.getElementById('photoInput').click()">
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display: none;" onchange="handleFileSelected(this, 'Чек')" />
+        <div class="action-icon">📸</div>
+        <div class="action-title" id="photoBtnTitle">Сфотографувати чек</div>
+        <div class="action-sub">З камери або фото</div>
+      </div>
+
+      <div class="action-upload-btn" onclick="document.getElementById('csvInput').click()">
+        <input type="file" id="csvInput" accept=".csv, .txt, .pdf" style="display: none;" onchange="handleFileSelected(this, 'Виписка')" />
+        <div class="action-icon">📊</div>
+        <div class="action-title" id="csvBtnTitle">Імпорт виписки</div>
+        <div class="action-sub">Банківський .CSV</div>
+      </div>
     </div>
 
     <!-- Діаграма -->
@@ -506,7 +517,7 @@
       </div>
     </div>
 
-    <!-- Останні транзакції -->
+    <!-- Список транзакцій -->
     <div class="card">
       <div class="section-title">Останні транзакції</div>
       <div class="tx-list" id="txList"></div>
@@ -515,7 +526,7 @@
 
   <script>
     let currentAuthMode = 'login';
-    let currentEntryMode = 'smart'; // 'smart' або 'manual'
+    let currentEntryMode = 'smart';
     let selectedCategory = '';
     let expenseChart = null;
 
@@ -530,10 +541,21 @@
       
       if (!token) {
         modal.style.display = 'flex';
+        resetUI();
       } else {
         modal.style.display = 'none';
         document.getElementById('userBadge').innerText = email || 'Мій акаунт';
         loadDashboard();
+      }
+    }
+
+    function resetUI() {
+      document.getElementById('totalSpent').innerText = '0.00 ₴';
+      document.getElementById('forecastVal').innerText = '0.00 ₴';
+      document.getElementById('txList').innerHTML = '<div style="color:#64748b;font-size:0.85rem;text-align:center;padding:12px;">Увійдіть для перегляду витрат</div>';
+      if (expenseChart) {
+        expenseChart.destroy();
+        expenseChart = null;
       }
     }
 
@@ -553,7 +575,6 @@
       }
     }
 
-    // Перемикач двох режимів додавання витрати
     function switchEntryMode(mode) {
       currentEntryMode = mode;
       const smartTab = document.getElementById('tabModeSmart');
@@ -597,6 +618,8 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Помилка авторизації');
 
+        // Очищаємо залишки старого акаунту
+        localStorage.clear();
         localStorage.setItem('token', data.token);
         localStorage.setItem('user_email', data.email);
         errorDiv.style.display = 'none';
@@ -608,8 +631,7 @@
     }
 
     function logout() {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user_email');
+      localStorage.clear();
       checkAuth();
     }
 
@@ -652,7 +674,6 @@
       const labels = Object.keys(breakdown);
       const values = labels.map(k => breakdown[k].sum);
       const totalSum = values.reduce((a, b) => a + b, 0);
-
       const colors = ['#48cae4', '#0077b6', '#52b788', '#f77f00', '#d62828'];
 
       if (expenseChart) expenseChart.destroy();
@@ -660,12 +681,11 @@
       expenseChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: totalSum > 0 ? labels.map(l => l.toUpperCase()) : ['Поки немає даних'],
+          labels: totalSum > 0 ? labels.map(l => l.toUpperCase()) : ['Поки немає витрат'],
           datasets: [{
             data: totalSum > 0 ? values : [1],
             backgroundColor: totalSum > 0 ? colors : ['#243056'],
-            borderWidth: 0,
-            hoverOffset: 4
+            borderWidth: 0
           }]
         },
         options: {
@@ -687,7 +707,7 @@
       listEl.innerHTML = '';
 
       if (!list || list.length === 0) {
-        listEl.innerHTML = '<div style="color:#64748b;font-size:0.85rem;text-align:center;padding:12px;">Немає записів</div>';
+        listEl.innerHTML = '<div style="color:#64748b;font-size:0.85rem;text-align:center;padding:12px;">У вас поки немає витрат</div>';
         return;
       }
 
@@ -711,48 +731,23 @@
       });
     }
 
-    // Додавання витрати (обробляє обидва режими)
     async function addExpense() {
       let payload = {};
+      const url = currentEntryMode === 'smart' ? '/api/expenses/smart-add' : '/api/expenses/manual-add';
 
       if (currentEntryMode === 'smart') {
-        const rawInput = document.getElementById('rawInput');
-        const text = rawInput.value.trim();
-        if (!text) {
-          alert('Введіть текст витрати із сумою (наприклад: Сільпо 350)');
-          return;
-        }
-        payload = {
-          raw_text: text,
-          manual_category: selectedCategory || null
-        };
+        const text = document.getElementById('rawInput').value.trim();
+        if (!text) return alert('Вкажіть витрату і суму (наприклад: Сільпо 350)');
+        payload = { raw_text: text, manual_category: selectedCategory || null };
       } else {
-        // Режим вручну
-        const descInput = document.getElementById('manualDescInput');
-        const amtInput = document.getElementById('manualAmountInput');
-        const desc = descInput.value.trim();
-        const amt = parseFloat(amtInput.value);
-
-        if (!desc) {
-          alert('Введіть назву витрати');
-          return;
-        }
-        if (isNaN(amt) || amt <= 0) {
-          alert('Введіть коректну суму');
-          return;
-        }
-
-        payload = {
-          description: desc,
-          amount: amt,
-          category: selectedCategory || null
-        };
+        const desc = document.getElementById('manualDescInput').value.trim();
+        const amt = parseFloat(document.getElementById('manualAmountInput').value);
+        if (!desc || isNaN(amt) || amt <= 0) return alert('Вкажіть коректну назву та суму');
+        payload = { description: desc, amount: amt, category: selectedCategory || null };
       }
 
       const btn = document.getElementById('saveBtn');
       btn.innerText = 'Збереження...';
-
-      const url = currentEntryMode === 'smart' ? '/api/expenses/smart-add' : '/api/expenses/manual-add';
 
       try {
         const res = await authFetch(url, {
@@ -762,42 +757,39 @@
         });
 
         if (res.ok) {
-          if (currentEntryMode === 'smart') {
-            document.getElementById('rawInput').value = '';
-          } else {
-            document.getElementById('manualDescInput').value = '';
-            document.getElementById('manualAmountInput').value = '';
-          }
+          document.getElementById('rawInput').value = '';
+          document.getElementById('manualDescInput').value = '';
+          document.getElementById('manualAmountInput').value = '';
           await loadDashboard();
         } else {
           const err = await res.json();
           alert(err.detail || 'Помилка збереження');
         }
-      } catch (err) {
-        alert(err.message || 'Помилка мережі');
+      } catch (e) {
+        alert('Помилка мережі');
       } finally {
         btn.innerText = 'Зберегти витрату';
       }
     }
 
-    function triggerFileInput() {
-      document.getElementById('fileInput').click();
-    }
-
-    async function handleFileUpload(input) {
+    async function handleFileSelected(input, typeName) {
       if (!input.files || input.files.length === 0) return;
       const file = input.files[0];
-      const titleEl = document.getElementById('uploadTitleText');
-      const subEl = document.getElementById('uploadSubText');
-
-      titleEl.innerText = 'Обробка через AI...';
-      subEl.innerText = 'Розпізнаємо витрати та призначаємо категорії';
-
       const formData = new FormData();
       formData.append('file', file);
 
+      const token = getAuthToken();
+      if (!token) {
+        alert('Будь ласка, спочатку увійдіть в акаунт');
+        return;
+      }
+
+      const isReceipt = typeName === 'Чек';
+      const labelEl = document.getElementById(isReceipt ? 'photoBtnTitle' : 'csvBtnTitle');
+      const originalText = labelEl.innerText;
+      labelEl.innerText = 'Обробка...';
+
       try {
-        const token = getAuthToken();
         const res = await fetch('/api/expenses/upload-statement', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
@@ -806,16 +798,15 @@
 
         const data = await res.json();
         if (res.ok) {
-          alert(`Готово! ${data.message}`);
+          alert(`Успішно! ${data.message || 'Операцію зафіксовано'}`);
           await loadDashboard();
         } else {
-          alert(data.detail || 'Помилка імпорту');
+          alert(data.detail || 'Помилка розпізнавання файлу');
         }
       } catch (err) {
-        alert('Помилка завантаження файлу');
+        alert('Не вдалося завантажити файл на сервер');
       } finally {
-        titleEl.innerText = 'Імпортувати виписку або чек';
-        subEl.innerText = 'Банківський експорт (.csv), фото чека або квитанція';
+        labelEl.innerText = originalText;
         input.value = '';
       }
     }

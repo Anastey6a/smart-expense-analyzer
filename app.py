@@ -523,3 +523,26 @@ if __name__ == "__main__":
 
   port = int(os.environ.get("PORT", 8000))
   uvicorn.run("app:app", host="0.0.0.0", port=port)
+  # Список технічних слів банківських виписок, які треба ігнорувати
+IGNORE_KEYWORDS = [
+    "ліцензія",
+    "нбу",
+    "квитанція",
+    "дата і час",
+    "сума грн",
+    "залишок",
+    "номер картки",
+    "єдрпоу",
+    "iban",
+]
+
+
+def is_valid_transaction(description: str, amount: float) -> bool:
+  desc_lower = description.lower()
+  # Якщо опис містить системні фрази банку — пропускаємо
+  if any(keyword in desc_lower for keyword in IGNORE_KEYWORDS):
+    return False
+  # Пропускаємо нульові суми
+  if amount <= 0:
+    return False
+  return True

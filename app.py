@@ -91,6 +91,7 @@ def serve_index():
   return FileResponse("index.html")
 
 
+# Моделі
 class UserAuth(BaseModel):
   email: str
   password: str
@@ -99,6 +100,12 @@ class UserAuth(BaseModel):
 class SmartExpensePayload(BaseModel):
   raw_text: str
   manual_category: str | None = None
+
+
+class ManualExpensePayload(BaseModel):
+  description: str
+  amount: float
+  category: str | None = None
 
 
 def create_token(user_id: int):
@@ -179,8 +186,9 @@ def predict_category(description: str) -> str:
     return "покупки"
 
 
+# РЕЖИМ 1: Швидкий Smart-текст (один рядок: 'Сільпо 350')
 @app.post("/api/expenses/smart-add")
-def add_expense(
+def add_smart_expense(
     payload: SmartExpensePayload, user_id: int = Depends(get_current_user_id)
 ):
   desc, amount = parse_raw_text(payload.raw_text)
@@ -209,7 +217,37 @@ def add_expense(
   return {"status": "success", "category": cat}
 
 
-# Обробка завантаження файлів (банківські виписки, чеки, квитанції)
+# РЕЖИМ 2: Класичне ручне введення (окремі поля: назва + сума + категорія)
+@app.post("/api/expenses/manual-add")
+def add_manual_expense(
+    payload: ManualExpensePayload, user_id: int = Depends(get_current_user_id)
+):
+  desc = payload.description.strip()
+  if not desc:
+    raise HTTPException(status_code=400, detail="Вкажіть назву витрати")
+  if payload.amount <= 0:
+    raise HTTPException(status_code=400, detail="Сума повинна бути більше 0")
+
+  cat = (
+      payload.category
+      if payload.category in TARGET_CATEGORIES
+      else predict_category(desc)
+  )
+  date_now = datetime.now().strftime("%d.%m %H:%M")
+
+  with sqlite3.connect(DB_FILE) as conn:
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO transactions (user_id, date, description, amount,"
+        " category) VALUES (?, ?, ?, ?, ?)",
+        (user_id, date_now, desc, payload.amount, cat),
+    )
+    conn.commit()
+
+  return {"status": "success", "category": cat}
+
+
+# Завантаження банківських виписок (.csv) або квитанцій
 @app.post("/api/expenses/upload-statement")
 async def upload_statement(
     file: UploadFile = File(...), user_id: int = Depends(get_current_user_id)
@@ -222,17 +260,14 @@ async def upload_statement(
 
   try:
     if filename.endswith(".csv"):
-      # Парсинг CSV (Приват24 / Монобанк / стандартні виписки)
       try:
         text_data = content.decode("utf-8")
       except UnicodeDecodeError:
         text_data = content.decode("cp1251", errors="ignore")
 
       df = pd.read_csv(io.StringIO(text_data), sep=None, engine="python")
-      # Приводимо назви стовпчиків до нижнього регістру
       df.columns = [str(c).strip().lower() for c in df.columns]
 
-      # Знаходимо колонки з описом та сумою
       desc_col = None
       amount_col = None
 
@@ -274,7 +309,6 @@ async def upload_statement(
       for _, row in df.iterrows():
         raw_desc = str(row.get(desc_col, "Витрата з виписки")).strip()
         raw_amt = str(row.get(amount_col, "0"))
-        # Очищення суми
         match = re.search(r"[-+]?(\d+([.,]\d+)?)", raw_amt)
         if match:
           val = abs(float(match.group(1).replace(",", ".")))
@@ -283,10 +317,8 @@ async def upload_statement(
             to_insert.append((user_id, date_now, raw_desc[:50], val, cat))
             parsed_count += 1
     else:
-      # Парсинг текстових виписок / чеків (TXT, структуровані квитанції)
       text_data = content.decode("utf-8", errors="ignore")
-      lines = text_data.splitlines()
-      for line in lines:
+      for line in text_data.splitlines():
         desc, amount = parse_raw_text(line)
         if amount and amount > 0:
           cat = predict_category(desc)
@@ -294,9 +326,8 @@ async def upload_statement(
           parsed_count += 1
 
     if not to_insert:
-      # Якщо це чек/фото або не вдалося розпізнати таблицю автоматично — додаємо як чек
       to_insert.append(
-          (user_id, date_now, f"Чек: {file.filename[:30]}", 150.0, "покупки")
+          (user_id, date_now, f"Чек: {file.filename[:30]}", 120.0, "покупки")
       )
       parsed_count = 1
 

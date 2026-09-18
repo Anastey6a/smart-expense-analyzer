@@ -6,11 +6,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="SmartExpense" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0b132b" />
   <link rel="manifest" href="/static/manifest.json" />
   <title>Smart Expense Analyzer</title>
 
-  <!-- Google Fonts & Chart.js -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -138,7 +137,6 @@
       font-size: 0.95rem;
     }
 
-    /* Add Expense Form */
     .input-group {
       display: flex;
       flex-direction: column;
@@ -213,14 +211,12 @@
       background-color: var(--accent-hover);
     }
 
-    /* Chart Card */
     .chart-container {
       position: relative;
       height: 220px;
       margin: 10px 0;
     }
 
-    /* Transactions list */
     .section-title {
       font-size: 1rem;
       font-weight: 600;
@@ -297,20 +293,21 @@
       color: var(--danger);
     }
 
-    /* Auth Modal */
+    /* Модальное окно авторизации */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(11, 19, 43, 0.92);
-      backdrop-filter: blur(10px);
+      background: rgba(11, 19, 43, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 16px;
-      z-index: 1000;
+      padding: 20px;
+      z-index: 9999;
     }
 
     .modal-card {
@@ -320,7 +317,7 @@
       max-width: 380px;
       border-radius: 24px;
       padding: 28px 24px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
       display: flex;
       flex-direction: column;
       gap: 18px;
@@ -347,7 +344,7 @@
     .auth-tab {
       flex: 1;
       text-align: center;
-      padding: 8px;
+      padding: 10px;
       font-size: 0.85rem;
       font-weight: 600;
       color: var(--text-muted);
@@ -370,8 +367,8 @@
 </head>
 <body>
 
-  <!-- Вхід / Реєстрація Модальне Вікно -->
-<div class="modal-overlay" id="authModal" style="display: flex;"></div>
+  <!-- Модальное окно авторизации -->
+  <div class="modal-overlay" id="authModal" style="display: flex;">
     <div class="modal-card">
       <div class="modal-header">
         <h2 id="authTitle">Вхід у систему</h2>
@@ -394,16 +391,16 @@
     </div>
   </div>
 
+  <!-- Главный экран приложения -->
   <div class="container" id="appContent">
     <header>
       <div class="brand">
         <h1>Smart Expense</h1>
-        <div class="user-tag" id="userBadge">Завантаження...</div>
+        <div class="user-tag" id="userBadge">Користувач</div>
       </div>
       <button class="btn-logout" onclick="logout()">Вийти</button>
     </header>
 
-    <!-- Баланс і Прогноз -->
     <div class="card balance-card">
       <div class="balance-title">Загальні витрати</div>
       <div class="balance-val" id="totalSpent">0.00 ₴</div>
@@ -413,7 +410,6 @@
       </div>
     </div>
 
-    <!-- Додавання витрати -->
     <div class="card">
       <div class="section-title">Швидке додавання витрати</div>
       <div class="input-group">
@@ -434,7 +430,6 @@
       </div>
     </div>
 
-    <!-- Діаграма витрат -->
     <div class="card">
       <div class="section-title">Розподіл за категоріями</div>
       <div class="chart-container">
@@ -442,12 +437,9 @@
       </div>
     </div>
 
-    <!-- Останні транзакції -->
     <div class="card">
       <div class="section-title">Останні транзакції</div>
-      <div class="tx-list" id="txList">
-        <!-- Елементи списку додаються через JS -->
-      </div>
+      <div class="tx-list" id="txList"></div>
     </div>
   </div>
 
@@ -463,10 +455,12 @@
     function checkAuth() {
       const token = getAuthToken();
       const email = localStorage.getItem('user_email');
+      const modal = document.getElementById('authModal');
+      
       if (!token) {
-        document.getElementById('authModal').style.display = 'flex';
+        modal.style.display = 'flex';
       } else {
-        document.getElementById('authModal').style.display = 'none';
+        modal.style.display = 'none';
         document.getElementById('userBadge').innerText = email || 'Мій акаунт';
         loadDashboard();
       }
@@ -538,7 +532,9 @@
     async function authFetch(url, options = {}) {
       const token = getAuthToken();
       if (!options.headers) options.headers = {};
-      options.headers['Authorization'] = `Bearer ${token}`;
+      if (token) {
+        options.headers['Authorization'] = `Bearer ${token}`;
+      }
       
       const response = await fetch(url, options);
       if (response.status === 401) {
@@ -553,11 +549,11 @@
         const res = await authFetch('/api/dashboard');
         const data = await res.json();
 
-        document.getElementById('totalSpent').innerText = `${data.total_spent.toFixed(2)} ₴`;
-        document.getElementById('forecastVal').innerText = `${data.forecast_next_month.toFixed(2)} ₴`;
+        document.getElementById('totalSpent').innerText = `${Number(data.total_spent || 0).toFixed(2)} ₴`;
+        document.getElementById('forecastVal').innerText = `${Number(data.forecast_next_month || 0).toFixed(2)} ₴`;
 
-        renderChart(data.breakdown);
-        renderTransactions(data.recent_transactions);
+        renderChart(data.breakdown || {});
+        renderTransactions(data.recent_transactions || []);
       } catch (err) {
         console.error(err);
       }
@@ -670,7 +666,6 @@
       }
     }
 
-    // Запуск при завантаженні сторінки
     window.onload = checkAuth;
   </script>
 </body>

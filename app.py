@@ -4,7 +4,7 @@ import io
 import os
 import re
 import sqlite3
-from fastapi import Depends, FastAPI, File, HTTPException, status, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -14,7 +14,7 @@ import joblib
 import pandas as pd
 from pydantic import BaseModel
 
-SECRET_KEY = "super-secret-key-change-this-in-production"
+SECRET_KEY = "smart-expense-secret-key-2026"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
@@ -25,6 +25,7 @@ app = FastAPI(title="Smart Expense Analyzer")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -38,7 +39,6 @@ except Exception:
   classifier = None
 
 
-# Надійне хешування без зовнішніх несумісних бібліотек
 def hash_password(password: str) -> str:
   salt = "expense_salt_2026"
   return hashlib.sha256((password + salt).encode("utf-8")).hexdigest()
@@ -61,14 +61,22 @@ def init_db():
     cursor.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
+                user_id INTEGER DEFAULT 1,
                 date TEXT NOT NULL,
                 description TEXT NOT NULL,
                 amount REAL NOT NULL,
-                category TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users (id)
+                category TEXT NOT NULL
             )
         """)
+
+    # Авто-міграція: додаємо user_id, якщо база була створена раніше без нього
+    cursor.execute("PRAGMA table_info(transactions)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if "user_id" not in columns:
+      cursor.execute(
+          "ALTER TABLE transactions ADD COLUMN user_id INTEGER DEFAULT 1"
+      )
+
     conn.commit()
 
 
@@ -110,13 +118,15 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
   except (JWTError, TypeError, ValueError):
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Недійсний або прострочений токен",
+        detail="Необхідно увійти в акаунт",
     )
 
 
 @app.post("/api/auth/register")
 def register(user: UserAuth):
   email = user.email.strip().lower()
+  if not email or not user.password:
+    raise HTTPException(status_code=400, detail="Заповніть усі поля")
   pwd_hash = hash_password(user.password)
   try:
     with sqlite3.connect(DB_FILE) as conn:
@@ -180,9 +190,12 @@ def add_expense(
     if classifier is None:
       cat = "покупки"
     else:
-      cat = classifier.predict([desc])[0]
+      try:
+        cat = classifier.predict([desc])[0]
+      except Exception:
+        cat = "покупки"
 
-  date_now = datetime.now().strftime("%Y-%m-%d %H:%M")
+  date_now = datetime.now().strftime("%d.%m %H:%M")
   with sqlite3.connect(DB_FILE) as conn:
     cursor = conn.cursor()
     cursor.execute(
